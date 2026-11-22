@@ -1,4 +1,10 @@
-# ForeverTrader 3.1 – Getting started
+# ForeverTrader 3.2 – Getting started
+
+## 3.2: live-goldtest (let op: geen onbewaakte bot)
+De standaardmodus blijft paper trading. Je kunt binnen WoW optioneel `/ft live on` gebruiken **bij het geopende AH** na `/ft market`, `/ft start` en het laden van een FT3-planning. De coach laat dan uitsluitend koopadviezen door die gebaseerd zijn op AH-zoekresultaten jonger dan 60 seconden, met maximaal 1g per advies, 5g per sessie en minimaal 15g of 20% walletreserve. **Je moet de daadwerkelijke aankopen en verkoopplaatsingen zelf bevestigen.** De addon automatiseert dat niet. Schakel uit met `/ft live off`. Alle details: [docs/LIVE-TEST-3.2.md](docs/LIVE-TEST-3.2.md).
+
+De paper-verkoopcontrole is aangescherpt: twee opeenvolgende marktobservaties zijn nodig, maar ook dit blijft een modelschatting. De onjuiste 0g-wallet-export bij logout wordt voorkomen en bestaande verdachte exports krijgen een waarschuwing. Bestaande paper-resultaten uit eerdere versies blijven ongewijzigd in de database.
+
 
 EU PvP Alliance. Windows. Eerst paper trading; echte transacties blijven handmatig. De desktopengine houdt historie, dag-/weekpatronen, onderzoek en een fictieve portefeuille bij; de in-game coach zegt wat je zelf moet doen. Geen automatische besturing, klikken, kopen, verkopen of mailbox ophalen.
 
