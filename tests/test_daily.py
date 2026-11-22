@@ -7,6 +7,7 @@ from unittest.mock import patch
 from zoneinfo import ZoneInfo
 
 import daily
+import coach
 import trader as ft
 
 
@@ -59,6 +60,21 @@ class DailyWindowsTest(unittest.TestCase):
             ft.obs(self.db, 2589, when, {'ask': 100 if hour < 12 else 99999}, 'demo')
         p = daily.analyse(self.db, 2589, self.at, self.c, 'demo')
         self.assertFalse(p['eligible'])
+
+    def test_coach_handoffs_daily_beyond_watchlist(self):
+        # Model found a vetted daily window for an imported item not on the old
+        # 21-item watchlist; it must be reachable in the in-game FT3 plan.
+        item_id = 3575
+        self.assertNotIn(item_id, self.c['watchlist'])
+        ft.item(self.db, item_id, {'name': 'Iron Bar', 'cls': 'Trade Goods', 'vendor': 1})
+        ft.decision(self.db, self.at, self.at, item_id, 'daily', 'BUY_MODEL',
+                    'eligible paper order', self.vid, 100, 120, 100, 12, .7,
+                    {'hold_hours': 8, 'deposit_per_unit': 1,
+                     'buy_window': 'Ochtend', 'sell_window': 'Avond'})
+        payload, rows, message = coach.build_plan(self.db, self.c, self.at, 'paper')
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]['strategy'], 'daily')
+        self.assertIn(';3575:', payload)
 
     def test_scale_paper_buy_to_budget(self):
         self.seed()
