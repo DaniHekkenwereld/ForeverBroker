@@ -71,9 +71,9 @@ class DailyWindowsTest(unittest.TestCase):
     def test_coach_handoffs_daily_beyond_watchlist(self):
         # Model found a vetted daily window for an imported item not on the old
         # 21-item watchlist; it must be reachable in the in-game FT3 plan.
-        item_id = 3575
+        item_id = 3356
         self.assertNotIn(item_id, self.c['watchlist'])
-        ft.item(self.db, item_id, {'name': 'Iron Bar', 'cls': 'Trade Goods', 'vendor': 1})
+        ft.item(self.db, item_id, {'name': 'Kingsblood', 'cls': 'Trade Goods', 'vendor': 1})
         ft.decision(self.db, self.at, self.at, item_id, 'daily', 'BUY_MODEL',
                     'eligible paper order', self.vid, 100, 120, 100, 12, .7,
                     {'hold_hours': 8, 'deposit_per_unit': 1,
@@ -81,7 +81,7 @@ class DailyWindowsTest(unittest.TestCase):
         payload, rows, message = coach.build_plan(self.db, self.c, self.at, 'paper')
         self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0]['strategy'], 'daily')
-        self.assertIn(';3575:', payload)
+        self.assertIn(';3356:', payload)
 
     def test_scale_paper_buy_to_budget(self):
         self.seed()
