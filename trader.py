@@ -10,7 +10,7 @@ import opportunities
 import characters
 import sync_client
 ROOT=pathlib.Path(__file__).resolve().parent
-VERSION='3.5.0'; MARKET=old.MARKET; BASE='https://auctionhouse.tk.gg/api'
+VERSION='4.0.0'; MARKET=old.MARKET; BASE='https://auctionhouse.tk.gg/api'
 UTC=dt.timezone.utc
 D=lambda x: json.dumps(x,ensure_ascii=False,sort_keys=True,separators=(',',':'))
 SCHEMA='''
