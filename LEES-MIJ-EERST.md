@@ -1,4 +1,11 @@
-# ForeverTrader 3.3 – Getting started
+# ForeverTrader 3.3.1 – Getting started
+
+## 3.3.1: handsfree AH-zoeken en gesproken route
+
+Na `.\\UPDATE.bat` installeer je **AutoHotkey v2** en start je `.\\START-AUDIO.bat`. In WoW: `/ft market`, `/ft start`, `/ft plan` met de actuele FT3-regel en `/ft auto on` bij het AH. Automatische zoekopdrachten volgen elkaar vervolgens op zonder telkens op Zoek volgend te klikken. AHK spreekt "Loop naar het Auction House" en "Loop naar de mailbox"; druk **F6** terwijl WoW actief is om het WoW-venster aan AHK te koppelen. **F7** test AH-spraak, **F8** test mailbox-spraak en **F9** stopt het AHK-script. `/ft auto off` stopt de automatische zoekwachtrij.
+
+**Automatisch kopen en verkopen is nog niet geïmplementeerd of getest.** Er wordt alleen automatisch gezocht; je bestaande 5g live-advieslimiet blijft gelden. Details: [docs/AHK-AUDIO-3.3.1.md](docs/AHK-AUDIO-3.3.1.md).
+
 
 ## 3.3: Dagplanning op lokale uren
 
