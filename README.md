@@ -2,6 +2,23 @@
 
 ForeverTrader v3.1 — tradingcoach en paper-tradingengine voor WoW Forever EU PvP Alliance.
 
+## Bijwerken (Windows)
+
+Voor een bestaande ZIP-installatie zonder Git voer je **eenmalig** in de hoofdmap uit:
+
+```powershell
+Invoke-WebRequest https://raw.githubusercontent.com/DaniHekkenwereld/ForeverBroker/main/update.ps1 -OutFile .\update.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\update.ps1
+```
+
+Daarna gebruik je bij iedere nieuwe versie alleen:
+
+```powershell
+.\UPDATE.bat
+```
+
+Sluit eerst WoW en `START.bat`. De updater bewaart `config.json` en `data/` en vernieuwt, wanneer `wow_folder` is ingesteld, ook de WoW-addon. In een Git-clone gebruikt de updater `git pull --ff-only` (lokale wijzigingen kunnen dat blokkeren).
+
 ## Getting started
 
 1. Lees [LEES-MIJ-EERST.md](LEES-MIJ-EERST.md).
