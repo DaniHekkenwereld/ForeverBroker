@@ -1,6 +1,6 @@
 # ForeverBroker
 
-ForeverTrader **v3.3.0** — tradingcoach, conservatievere paper-tradingengine en optionele live-goldtest met handmatige transacties voor WoW Forever EU PvP Alliance.
+ForeverTrader **v3.3.1** — tradingcoach, conservatievere paper-tradingengine en optionele live-goldtest met handmatige transacties voor WoW Forever EU PvP Alliance.
 
 ## Bijwerken (Windows)
 
@@ -18,6 +18,15 @@ Daarna gebruik je bij iedere nieuwe versie alleen:
 ```
 
 Sluit eerst WoW en `START.bat`. De updater bewaart `config.json` en `data/` en vernieuwt, wanneer `wow_folder` is ingesteld, ook de WoW-addon. In een Git-clone gebruikt de updater `git pull --ff-only` (lokale wijzigingen kunnen dat blokkeren).
+
+## Nieuw in 3.3.1: automatisch AH zoeken + AHK-audiocues
+
+- Met `/ft auto on` zoekt de addon zelfstandig de items uit je ingeladen FT3-planning zolang je bij het AH staat. Bij een geschikte koop- of verkoopsituatie pauzeert hij zodat de actuele prijs zichtbaar blijft. `/ft auto off` schakelt dit uit.
+- Windows **AutoHotkey v2** spreekt **"Loop naar het Auction House"** of **"Loop naar de mailbox"** wanneer de coach daarom vraagt. Installeer AHK v2, start `.\\START-AUDIO.bat` en druk **F6** terwijl WoW actief is. **F7/F8** testen de twee meldingen, **F9** stopt AHK.
+- De koppeling leest uitsluitend twee kleine statuskleurvlakken uit het spelvenster. Er wordt niet gescreend op itemprijzen en geen gamegeheugen gelezen.
+- **Niet verwarren met een automatische handelaar:** aankopen, verkopen en posten zijn in deze versie nog niet automatisch; daarvoor is eerst een geteste client-specifieke transactie-uitvoerder nodig. De bestaande 5g live-testlimieten gelden nog.
+
+Meer: [AHK-audio en automatisch zoeken](docs/AHK-AUDIO-3.3.1.md).
 
 ## Nieuw in 3.3: dagelijkse inkoop/verkoop planning
 
