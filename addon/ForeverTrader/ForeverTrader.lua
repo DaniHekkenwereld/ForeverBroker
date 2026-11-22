@@ -1,4 +1,4 @@
--- ForeverTrader v3.3.1 - automatic read-only AH searches + AHK speech status bridge.
+-- ForeverTrader v3.4.1 - account-wide per-character inventory snapshots.
 local L=ForeverTraderLogic
 local T=ForeverTraderTarget
 local frame=CreateFrame('Frame')
@@ -15,6 +15,7 @@ local pending,lastQuery=nil,0
 local browseFull=false
 local targetMode=true
 local update
+local recordCharacter
 local function owned()
     if not s.ahOpen or not C_AuctionHouse or not C_AuctionHouse.GetOwnedAuctions or not C_AuctionHouse.HasFullOwnedAuctionResults or not C_AuctionHouse.HasFullOwnedAuctionResults() then return end
     local rows={};listed={};for _,a in ipairs(C_AuctionHouse.GetOwnedAuctions() or {}) do
@@ -22,6 +23,8 @@ local function owned()
         if i and q and a.status==0 then listed[i]=(listed[i] or 0)+q;rows[#rows+1]=i..":"..q..":"..(b or 0) end
     end
     table.sort(rows);db().owned=now()..";"..table.concat(rows,";")
+    s.ownedKnown=true
+    if recordCharacter then recordCharacter('owned') end
 end
 local function gold(n) return string.format('%.2fg',(n or 0)/10000) end
 local function wallet()
@@ -30,6 +33,7 @@ local function wallet()
     if s.live and s.walletKnown and money<s.cash then s.liveSpent=s.liveSpent+s.cash-money end
     s.cash=money;s.walletKnown=true
     db().wallet=string.format('%d|%d|%s|%s',now(),money,f,r)
+    if recordCharacter then recordCharacter('wallet') end
 end
 local function getBags()
     bags={}; if not C_Container or not C_Container.GetContainerItemInfo then return end
@@ -39,6 +43,8 @@ local function getBags()
     end end
     local rows={};for id,q in pairs(bags) do rows[#rows+1]=id..':'..q end;table.sort(rows)
     db().bags=now()..';'..table.concat(rows,';')
+    s.bagsKnown=true
+    if recordCharacter then recordCharacter('bags') end
 end
 local function mailbox()
     if not s.mailOpen or not GetInboxNumItems or not GetInboxInvoiceInfo or not GetInboxHeaderInfo then return end
@@ -61,7 +67,74 @@ local function mailbox()
     s.pending=pending;s.eta=eta;s.ready=ready;s.attachments=attachments;s.partial=type(total)=='number' and total>n or false;s.unknown=unknown;s.mailKnown=true;s.lastMail=now();s.mailAlert=false;s.bought=false;s.buyBlocked=false
     db().mail=string.format('%d|%d|%d',s.lastMail,pending,ready)
     db().mail3=string.format('%d|%d|%d|%d|%d|%d',s.lastMail,pending,ready,attachments,s.partial and 1 or 0,unknown)
+    if recordCharacter then recordCharacter('mail') end
 end
+-- Store snapshots of ALL previously visited characters on the same account.
+-- SavedVariables are written by WoW at logout/reload, not immediately on login.
+-- charactersWire is a bounded line-oriented export that desktop Python can parse
+-- safely without executing arbitrary SavedVariables Lua.
+recordCharacter=function(reason)
+    if not UnitName or not GetRealmName then return end
+    local character=UnitName('player');local realm=GetRealmName()
+    if type(character)~='string' or character=='' or type(realm)~='string' or realm=='' then return end
+    local d=db()
+    if type(d.characters)~='table' then d.characters={} end
+    local key=realm..'#'..character
+    local rec=d.characters[key]
+    if type(rec)~='table' then rec={name=character,realm=realm} end
+    rec.name=character;rec.realm=realm;rec.faction=(UnitFactionGroup and UnitFactionGroup('player')) or 'Unknown'
+    rec.lastSeen=now();rec.lastUpdate=reason
+    if UnitGUID then rec.guid=UnitGUID('player') end
+    if not s.loggingOut and s.walletKnown then rec.gold=s.cash;rec.walletAt=now() end
+    if s.bagsKnown then
+        rec.bags={}
+        for id,q in pairs(bags) do
+            if type(id)=='number' and type(q)=='number' and id>0 and q>0 then rec.bags[id]=q end
+        end
+        rec.bagsAt=now()
+    end
+    if s.ownedKnown then
+        rec.auctions={}
+        for id,q in pairs(listed) do if type(id)=='number' and type(q)=='number' and id>0 and q>0 then rec.auctions[id]=q end end
+        rec.auctionsAt=now()
+    end
+    if s.mailKnown then
+        rec.mailAt=s.lastMail;rec.mailPending=s.pending or 0;rec.mailReady=s.ready or 0
+        rec.mailAttachments=s.attachments or 0
+    end
+    d.characters[key]=rec
+    local function safe(v)return tostring(v or ''):gsub('[|;"\\\r\n]','_') end
+    local function sums(items)
+        local rows={}
+        if type(items)=='table' then
+            for id,qty in pairs(items) do
+                if type(id)=='number' and type(qty)=='number' and id>0 and qty>0 then rows[#rows+1]=string.format('%d:%d',id,qty) end
+            end
+        end
+        table.sort(rows)
+        return table.concat(rows,',')
+    end
+    local rows={}
+    for _,c in pairs(d.characters) do
+        if type(c)=='table' and type(c.name)=='string' and type(c.realm)=='string' and type(c.lastSeen)=='number' then
+            rows[#rows+1]={at=c.lastSeen,line=table.concat({
+                safe(c.lastSeen),safe(c.realm),safe(c.name),safe(c.faction),safe(c.gold),
+                safe(c.walletAt),safe(c.bagsAt),sums(c.bags),
+                safe(c.auctionsAt),sums(c.auctions),safe(c.mailAt),
+                safe(c.mailPending),safe(c.mailReady),safe(c.mailAttachments)
+            },'|')}
+        end
+    end
+    table.sort(rows,function(a,b)return a.at>b.at end)
+    local output={'FTCHAR1'}
+    local size=7
+    for _,r in ipairs(rows) do
+        if #output>=40 or size+#r.line+1>60000 then break end
+        output[#output+1]=r.line;size=size+#r.line+1
+    end
+    d.charactersWire=table.concat(output,';')
+end
+
 local function scan()
     if not C_AuctionHouse or not C_AuctionHouse.GetNumReplicateItems or not C_AuctionHouse.GetReplicateItemInfo then return end
     local n=C_AuctionHouse.GetNumReplicateItems(); if type(n)~='number' or n<=0 then return end
@@ -284,12 +357,19 @@ local function maybeAutoSearch()
     searchNext(nil,true)
 end
 local function mailSignal() if HasNewMail then local has=HasNewMail() and true or false;if has and not s.lastMailSignal and not s.mailOpen then s.mailAlert=true end;s.lastMailSignal=has end end
-for _,event in ipairs({'PLAYER_LOGIN','PLAYER_LOGOUT','PLAYER_MONEY','MAIL_SHOW','MAIL_CLOSED','MAIL_INBOX_UPDATE','UPDATE_PENDING_MAIL','REPLICATE_ITEM_LIST_UPDATE','AUCTION_HOUSE_SHOW','AUCTION_HOUSE_CLOSED','PLAYER_INTERACTION_MANAGER_FRAME_SHOW','PLAYER_INTERACTION_MANAGER_FRAME_HIDE','BAG_UPDATE_DELAYED','OWNED_AUCTIONS_UPDATED','ITEM_PURCHASED','COMMODITY_PURCHASE_SUCCEEDED','AUCTION_HOUSE_AUCTIONS_EXPIRED','AUCTION_HOUSE_AUCTION_CREATED','ITEM_SEARCH_RESULTS_UPDATED','ITEM_SEARCH_RESULTS_ADDED','COMMODITY_SEARCH_RESULTS_UPDATED','COMMODITY_SEARCH_RESULTS_ADDED','AUCTION_HOUSE_BROWSE_RESULTS_UPDATED','AUCTION_HOUSE_BROWSE_RESULTS_ADDED'}) do pcall(frame.RegisterEvent,frame,event) end
+for _,event in ipairs({'PLAYER_LOGIN','PLAYER_ENTERING_WORLD','PLAYER_LOGOUT','PLAYER_MONEY','MAIL_SHOW','MAIL_CLOSED','MAIL_INBOX_UPDATE','UPDATE_PENDING_MAIL','REPLICATE_ITEM_LIST_UPDATE','AUCTION_HOUSE_SHOW','AUCTION_HOUSE_CLOSED','PLAYER_INTERACTION_MANAGER_FRAME_SHOW','PLAYER_INTERACTION_MANAGER_FRAME_HIDE','BAG_UPDATE_DELAYED','OWNED_AUCTIONS_UPDATED','ITEM_PURCHASED','COMMODITY_PURCHASE_SUCCEEDED','AUCTION_HOUSE_AUCTIONS_EXPIRED','AUCTION_HOUSE_AUCTION_CREATED','ITEM_SEARCH_RESULTS_UPDATED','ITEM_SEARCH_RESULTS_ADDED','COMMODITY_SEARCH_RESULTS_UPDATED','COMMODITY_SEARCH_RESULTS_ADDED','AUCTION_HOUSE_BROWSE_RESULTS_UPDATED','AUCTION_HOUSE_BROWSE_RESULTS_ADDED'}) do pcall(frame.RegisterEvent,frame,event) end
 frame:SetScript('OnEvent',function(_,e,...)
     local key=...
     check(function()
-        if e=='PLAYER_LOGIN' then ensureAuctionatorListener();s.loggingOut=false;s.autoSearch=false;s.autoSearchCount=0;s.live=false;s.liveSpent=0;s.walletKnown=false;s.active=false;plan=L.plan(db().planText,now());getBags();mailSignal();ui:Hide()
-        elseif e=='PLAYER_LOGOUT' then s.loggingOut=true
+        if e=='PLAYER_LOGIN' then
+            ensureAuctionatorListener()
+            s.loggingOut=false;s.autoSearch=false;s.autoSearchCount=0
+            s.live=false;s.liveSpent=0;s.walletKnown=false;s.bagsKnown=false;s.ownedKnown=false
+            s.mailKnown=false;s.active=false;s.cash=0;s.ahOpen=false;s.mailOpen=false
+            bags={};listed={};targetBook={};plan=L.plan(db().planText,now())
+            getBags();wallet();mailSignal();ui:Hide()
+        elseif e=='PLAYER_ENTERING_WORLD' then getBags();wallet()
+        elseif e=='PLAYER_LOGOUT' then s.loggingOut=true;recordCharacter('logout')
         elseif e=='MAIL_SHOW' then s.mailOpen=true;s.mailKnown=false;s.ahOpen=false;if C_Timer and C_Timer.After then C_Timer.After(1,function() if s.mailOpen then check(function() mailbox();update() end) end end) end
         elseif e=='MAIL_INBOX_UPDATE' then mailbox()
         elseif e=='MAIL_CLOSED' then s.mailOpen=false
