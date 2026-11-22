@@ -203,14 +203,18 @@ def main():
     p.add_argument('--once',action='store_true',help='Upload en download eenmalig')
     p.add_argument('--poll',type=int,default=15,help='Controleer iedere N seconden (min 10)')
     a=p.parse_args()
-    previous=None;last_try=0
+    previous=None;last_try=0;was_running=None
     while True:
         try:
             c=trader.conf();path,_=legacy.saved_path(c)
-            # Always refresh after an updated WoW SavedVariables file. Even if
-            # unchanged, refresh every 10 minutes for new market strategies.
+            game_now=game_running()
+            # A logout may flush SavedVariables while WoW stays at character
+            # selection. Upload immediately. When WoW later fully exits,
+            # download and stage the newest strategy right away.
+            just_closed=(was_running is True and game_now is False)
+            was_running=game_now
             stamp=path.stat().st_mtime_ns if path and path.exists() else None
-            if a.once or stamp!=previous or time.time()-last_try>=600:
+            if a.once or stamp!=previous or just_closed or time.time()-last_try>=600:
                 message=sync_once()
                 print(time.strftime('%H:%M:%S'),message,flush=True)
                 # Our own prelogin plan injection updates the file timestamp;
