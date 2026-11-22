@@ -1,6 +1,6 @@
 # ForeverBroker
 
-ForeverTrader **v3.5.0** — tradingcoach, conservatievere paper-tradingengine en optionele live-goldtest met handmatige transacties voor WoW Forever EU PvP Alliance.
+ForeverTrader **v4.0.0** — tradingcoach, conservatievere paper-tradingengine en optionele live-goldtest met handmatige transacties voor WoW Forever EU PvP Alliance.
 
 ## Bijwerken (Windows)
 
