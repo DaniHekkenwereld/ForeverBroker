@@ -22,6 +22,25 @@ class CoachTests(unittest.TestCase):
   self.assertTrue(all(r['strategy']=='monitor' and r['max']==0 and r['qty']==0 for r in rows))
   self.assertIn(';2589:0:0:0:0',payload)
   self.assertIn('0 koopkansen',msg)
+ def test_stale_market_still_generates_read_only_monitor_plan(self):
+  market={2589:{'name':'Linen Cloth','ask':100,'cls':'Trade Goods','vol24':1200,'nc':False},
+          2592:{'name':'Wool Cloth','ask':300,'cls':'Trade Goods','vol24':600,'nc':False}}
+  ft.save_market(self.db,self.t,market,self.t,'tk')
+  self.add(i=2589,target=160)
+  now=self.t+7200
+  payload,rows,msg=coach.build_plan(self.db,self.c,now,'paper')
+  self.assertEqual(len(rows),2)
+  self.assertTrue(all(r['strategy']=='monitor' and r['qty']==0 and r['max']==0 and r['target']==0 for r in rows))
+  self.assertTrue(all(r['stale'] for r in rows))
+  self.assertIn('Geen koopadvies',msg)
+  self.assertTrue(payload.startswith(f'FT3|eu-2-110|{now}|{now+3600};'),payload)
+  self.assertIn('2589:0:0:0:0',payload)
+ def test_stale_ignores_previous_paper_trades(self):
+  self.add(i=2589)
+  self.assertEqual(coach.build_plan(self.db,self.c,self.t+7200,'paper')[0],'')
+ def test_stale_snapshot_without_eligible_items_stays_empty(self):
+  ft.save_market(self.db,self.t,{2589:{'name':'Linen Cloth','ask':0,'cls':'Trade Goods','vol24':1000,'nc':False}},self.t,'tk')
+  self.assertEqual(coach.build_plan(self.db,self.c,self.t+7200,'paper')[0],'')
  def test_monitor_does_not_become_fake_buy(self):
   m={2589:{'name':'Linen Cloth','ask':100,'cls':'Trade Goods','vol24':2000,'nc':False}}
   ft.save_market(self.db,self.t,m,self.t,'tk')
