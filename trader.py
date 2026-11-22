@@ -6,7 +6,7 @@ import legacy as old
 import coach
 import targeted
 ROOT=pathlib.Path(__file__).resolve().parent
-VERSION='3.1.1'; MARKET=old.MARKET; BASE='https://auctionhouse.tk.gg/api'
+VERSION='3.1.2'; MARKET=old.MARKET; BASE='https://auctionhouse.tk.gg/api'
 UTC=dt.timezone.utc
 D=lambda x: json.dumps(x,ensure_ascii=False,sort_keys=True,separators=(',',':'))
 SCHEMA='''
