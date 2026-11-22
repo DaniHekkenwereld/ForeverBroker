@@ -20,6 +20,7 @@ local function widget()
  end})
 end
 function CreateFrame(...) local a=widget();frames[#frames+1]=a;return a end
+Auctionator={EventBus={Register=function(self,listener,events) self.listener=listener;self.event=events[1] end},IncrementalScan={Events={ScanComplete='incremental_scan_complete'}}}
 C_Container={GetContainerNumSlots=function()return 1 end,GetContainerItemInfo=function()return nil end}
 C_AuctionHouse={GetNumReplicateItems=function()return 1 end,GetReplicateItemInfo=function()return 'Linen',1,5,1,true,1,'',0,0,500,0,nil,nil,nil,nil,0,2589,true end,HasFullOwnedAuctionResults=function()return true end,GetOwnedAuctions=function()return {} end}
 local mail={{'seller_temp_invoice',0,100000,2000,5000,97000,0,0},{'seller',0,0,0,0,0,40000,0},{'buyer',0,0,0,0,0,0,1}}
@@ -30,5 +31,13 @@ local realprint=print;print=function(x) prints[#prints+1]=x end
 local function fire(e) assert(events[e],e);events[e].scripts.OnEvent(events[e],e) end
 dofile('addon/ForeverTrader/Logic.lua');dofile('addon/ForeverTrader/Target.lua');dofile('addon/ForeverTrader/ForeverTrader.lua');fire('PLAYER_LOGIN');SlashCmdList.FOREVERTRADER('market');SlashCmdList.FOREVERTRADER('start');fire('MAIL_SHOW');fire('MAIL_INBOX_UPDATE')
 assert(ForeverTraderDB.mail3==clock..'|97000|40000|1|0|0',ForeverTraderDB.mail3)
-assert(ForeverTraderDB.coach:match('|COLLECT|'));mail={};fire('MAIL_INBOX_UPDATE');assert(ForeverTraderDB.coach:match('|RETURN|'));fire('MAIL_CLOSED');fire('AUCTION_HOUSE_SHOW');assert(ForeverTraderDB.coach:match('|PLAN|'));fire('REPLICATE_ITEM_LIST_UPDATE');assert(ForeverTraderDB.scan:match('2589:5:500'));assert(ForeverTraderDB.coach:match('|PLAN|'));fire('ITEM_PURCHASED');assert(ForeverTraderDB.coach:match('|MAIL|'));for _,v in ipairs(prints)do assert(not v:match('Fout:'),v)end
+assert(ForeverTraderDB.coach:match('|COLLECT|'));mail={};fire('MAIL_INBOX_UPDATE');assert(ForeverTraderDB.coach:match('|RETURN|'));fire('MAIL_CLOSED');fire('AUCTION_HOUSE_SHOW');assert(ForeverTraderDB.coach:match('|PLAN|'));fire('REPLICATE_ITEM_LIST_UPDATE');assert(ForeverTraderDB.scan:match('2589:5:500'));
+assert(Auctionator.EventBus.event=='incremental_scan_complete')
+Auctionator.EventBus.listener.ReceiveEvent(nil,'incremental_scan_complete',{
+ {itemKey={itemID=2589,itemLevel=0,itemSuffix=0},minPrice=125,totalQuantity=90},
+ {itemKey={itemID=2572,itemSuffix=2},minPrice=50,totalQuantity=10},
+ {itemKey={itemID=2592},minPrice=200,totalQuantity=50},
+})
+assert(ForeverTraderDB.browseSummary==clock..';2589:125:90;2592:200:50',ForeverTraderDB.browseSummary);
+assert(ForeverTraderDB.coach:match('|PLAN|'));fire('ITEM_PURCHASED');assert(ForeverTraderDB.coach:match('|MAIL|'));for _,v in ipairs(prints)do assert(not v:match('Fout:'),v)end
 realprint('Lua client mock: mailbox invoice, events, scan and purchase transition OK')
