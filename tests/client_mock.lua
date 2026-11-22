@@ -60,6 +60,7 @@ end
 
 dofile('addon/ForeverTrader/Logic.lua')
 dofile('addon/ForeverTrader/Target.lua')
+dofile('addon/ForeverTrader/V4.lua')
 dofile('addon/ForeverTrader/ForeverTrader.lua')
 fire('PLAYER_LOGIN')
 assert(type(ForeverTraderDB.characters)=='table','account-wide snapshot must exist')
@@ -115,5 +116,6 @@ local beforeLogoutWallet=ForeverTraderDB.wallet
 currentMoney=0
 fire('PLAYER_LOGOUT')
 assert(ForeverTraderDB.wallet==beforeLogoutWallet,'logout must not overwrite wallet with 0g')
+assert(ForeverTraderDB.sessionsWire:match('^FTSESSION1;'),'logout should persist V4 session')
 for _,v in ipairs(prints)do assert(not v:match('Fout:'),v)end
 realprint('Lua client mock: auto AH search, dual audio marker, wallet and mail checks OK')
