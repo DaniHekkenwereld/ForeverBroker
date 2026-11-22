@@ -22,6 +22,10 @@ De selectie probeert **netto** marge na de ingestelde 5% AH-cut te vinden en nee
 
 **Dit model vergelijkt aanbodprijzen, geen bewezen eigen verkooptransacties.** Een prijsstijging in data betekent niet dat alle door jou gekochte items verkocht kunnen worden. Houd rekening met AH-concurrentie, listing deposit, mislukte verkopen en circa een uur vertraagde publieke marktdata.
 
+### Nieuwere snapshots
+
+De vorige logs haalden de markt om circa **:18** binnen, terwijl de publicatie veelal rond **:22–:23** kwam. Dat leverde structureel bijna **55 minuten oude** prijzen op. V3.3 verschuift de regelmatige marktupdate daarom naar ongeveer **:27** na ieder heel uur en blijft bij **maximaal één markt-GET per uur**. De eerste opstart zonder eerdere poging kan direct een bestaande momentopname laden. De bron kan alsnog vertraging oplopen; dit is geen in-game realtime prijs.
+
 ### Niet blind all-in
 
 De paper-simulatie reserveert **20% cash**. Daghandel mag maximaal **75% totale equity** gebruiken, met **35% per item**, zolang voldoende aanbod en liquiditeit bestaat. Voorbeeld: met fictieve 100g maximaal 35g in één item en in totaal 75g voor strategie `daily`. Dit is dus **niet je volledige echte goldvoorraad**. Hoge inzet op een prijsverschil zonder herhaalbaar bewijs vergroot het verliesrisico.
