@@ -1,6 +1,6 @@
 # ForeverBroker
 
-ForeverTrader **v3.2.0** — tradingcoach, conservatievere paper-tradingengine en optionele live-goldtest met handmatige transacties voor WoW Forever EU PvP Alliance.
+ForeverTrader **v3.3.0** — tradingcoach, conservatievere paper-tradingengine en optionele live-goldtest met handmatige transacties voor WoW Forever EU PvP Alliance.
 
 ## Bijwerken (Windows)
 
@@ -18,6 +18,16 @@ Daarna gebruik je bij iedere nieuwe versie alleen:
 ```
 
 Sluit eerst WoW en `START.bat`. De updater bewaart `config.json` en `data/` en vernieuwt, wanneer `wow_folder` is ingesteld, ook de WoW-addon. In een Git-clone gebruikt de updater `git pull --ff-only` (lokale wijzigingen kunnen dat blokkeren).
+
+## Nieuw in 3.3: dagelijkse inkoop/verkoop planning
+
+- Een nieuwe **Dagplanning**-tabel onderzoekt eerdere uren per item voor een goedkoop inkoopvenster en later verkoopvenster. Uren zijn lokaal (Europe/Amsterdam).
+- Minimaal **5 volledig geobserveerde dagen**, historische winrate **≥70%** en een conservatieve theoretische marge **≥8% netto na AH-cut**. Als dat niet gehaald wordt, verschijnt **Onvoldoende herhaalbaar**; geen verzonnen koopadvies.
+- Een daghandelkandidaat moet tijdens het werkelijke koopvenster onder de berekende maximumkoopprijs liggen; een verouderde publieke prijs is geen bewezen live AH-aanbod.
+- Bij geschikte daghandelkansen mag het paper-model **75% van de totale equity** inzetten, tot **35% per item**, en houdt minstens **20% cashreserve**. Er wordt op **absolute verwachte netto copperwinst** gerangschikt in plaats van alleen procentueel rendement.
+- De bestaande `config.json` blijft staan; extra velden zijn optioneel. De bestaande **live-goldtest blijft maximaal 5g per sessie** en **transacties blijven handmatig**.
+
+Lees de [daghandelhandleiding 3.3](docs/DAGHANDEL-3.3.md) voor de aannames en risico's.
 
 ## Nieuw in 3.2: live-goldtest
 
