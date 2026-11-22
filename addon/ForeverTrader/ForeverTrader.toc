@@ -1,7 +1,7 @@
 ## Interface: 16001
 ## Title: ForeverTrader
 ## Notes: Read-only trading coach, market plan, wallet and mailbox.
-## Version: 3.3.0
+## Version: 3.3.1
 ## SavedVariables: ForeverTraderDB
 ## OptionalDeps: Auctionator
 Logic.lua
