@@ -1,6 +1,16 @@
 # ForeverBroker
 
-ForeverTrader **v4.0.0** — tradingcoach, conservatievere paper-tradingengine en optionele live-goldtest met handmatige transacties voor WoW Forever EU PvP Alliance.
+ForeverTrader **v4.0.0** — centrale 24/7 AH-server, per-character handelsstrategie en WoW-addon voor WoW Forever EU PvP Alliance. De oudere paper-tradingengine blijft apart beschikbaar.
+
+## ForeverTrader V4: server denkt, addon handelt wanneer je speelt
+
+De v4-server verzamelt onafhankelijk van WoW elk uur de openbare marktprijzen en bouwt historie op. Hij bewaart de laatst gesynchroniseerde gold, tassen, bekende veilingen en afgesloten sessies **per character**, en berekent telkens nieuwe onderzoeks- en handelsadviezen op basis van historische prijsdata en beschikbare gold. De Windows-bridge verstuurt sessiegegevens na uitloggen en zet een korte `FT3`-controleplanning en adviezen per character klaar voordat WoW opnieuw start.
+
+**V4 starten:** installeer eerst een VPS met HTTPS en een geheime token, configureer daarna `FT_V4_URL` en `FT_SYNC_TOKEN` op Windows. Gebruik `PREPARE-V4.bat` voor eenmalig voorbereiden en `INSTALL-V4-BRIDGE.bat` voor de automatische brug. In-game: `/ft v4` voor adviezen, `/ft auto on` bij het AH voor read-only controles. Open lokaal `data/v4/dashboard.html` om de adviezen voor al je characters te bekijken.
+
+**Belangrijk:** draai op de VPS `v4_server.py` en NIET daarnaast `START.bat` voor dezelfde database. De addon kan geen internetverbinding openen; de bridge kan een serverplan pas veilig in SavedVariables zetten **nadat WoW volledig is afgesloten**. In één al lopende gamesessie komt geen nieuwe serverplanning binnen. Geen automatische koop- of verkoopacties. Geen geverifieerde GPH zolang we geen echte transactiekosten en verkoopresultaten hebben.
+
+[Volledige V4-handleiding, serverinstallatie, Windows-configuratie en beperkingen](docs/FOREVERTRADER-V4.md).
 
 ## Bijwerken (Windows)
 
