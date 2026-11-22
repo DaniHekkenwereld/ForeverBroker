@@ -1,4 +1,11 @@
-# ForeverTrader 3.3.1 – Getting started
+# ForeverTrader 3.4 – Getting started
+
+## 3.4: alle itemcategorieën scannen
+
+De desktop beoordeelt nu **alle items in de publieke AH-snapshot**, inclusief zeldzame BoE-armor, weapons, recipes en andere categorieën. De nieuwe tabel **Alle items: brede kansenradar** toont theoretisch winstgevende prijsverschillen, volume, laatst gemelde verkoop en betaalbaarheid met 20g. Deze kansen zijn **geen bevestigde AH-verkopen**. Willekeurige suffixes/enchants moeten in de game worden gecontroleerd.
+
+De FT3-planning gebruikt de beste nieuwe items als **monitor-only**: `/ft auto on` zoekt ze automatisch, maar koopt ze niet. [Uitleg en voorbeelden](docs/ALL-ITEMS-3.4.md).
+
 
 ## 3.3.1: handsfree AH-zoeken en gesproken route
 
