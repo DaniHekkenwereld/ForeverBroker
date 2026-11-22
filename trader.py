@@ -505,14 +505,25 @@ def dashboard(db,folder,c,clock,status,localmsg,m,mode):
         elif hour<p['buy_start']:state='Wachten op koopvenster'
         else:state='Koopvenster voorbij'
         name=m.get(i,{}).get('name') or (db.execute('SELECT name FROM items WHERE id=?',(i,)).fetchone() or [i])[0]
+        # Model-only profit potential: assumes buying the available cheap depth
+        # and selling ALL units at the target; not observed execution.
+        theoretical='—'; x=m.get(i,{})
+        if p['eligible'] and type(ask) is int and 0<ask<=p['ceiling']:
+            depth=x.get('depth5');volume=x.get('vol24')
+            if type(depth) is int and type(volume) is int:
+                deposit=math.ceil((x.get('vendor') or 0)*c['deposit_vendor_pct']/100)
+                unit_net=p['target']-math.ceil(p['target']*c['cut_pct']/100)-ask-deposit
+                cap=max(0,int(a['equity']*c['daily_item_pct']/100))
+                qty=min(depth,max(0,volume//6),cap//max(1,ask+deposit))
+                if unit_net>0 and qty>0:theoretical=old.gold(unit_net*qty)
         dailyrows.append((p['eligible'],p['conservative_net_roi'],(
             name,i,f"{p['buy_start']:02d}:00–{p['buy_end']:02d}:00",
             f"{p['sell_start']:02d}:00–{p['sell_end']:02d}:00",
             old.gold(p['ceiling']),old.gold(p['target']),p['samples'],
             f"{100*p['win_rate']:.0f}%",f"{p['conservative_net_roi']:+.1f}%",
-            state)))
+            theoretical,state)))
     dailyrows.sort(key=lambda x:(x[0],x[1]),reverse=True)
-    dailytable=table(['Item','ID','Inkoop (NL)','Verkoop (NL)','Max koop/st','Doel/st','Dagen','Winrate','Conservatieve ROI na cut','Advies'],
+    dailytable=table(['Item','ID','Inkoop (NL)','Verkoop (NL)','Max koop/st','Doel/st','Dagen','Winrate','Conservatieve ROI na cut','Theoretische winst als alles verkoopt','Advies'],
                      [r[2] for r in dailyrows]) if dailyrows else '<p>Nog niet genoeg volledige dagen met uurdata. Historische imports lopen door.</p>'
     eligible_count=sum(bool(r[0]) for r in dailyrows)
     daynotice=f"{eligible_count} van {len(dailyrows)} items voldoen aan de historische daghandelfilter. Dit zijn geen gegarandeerde AH-verkopen."
