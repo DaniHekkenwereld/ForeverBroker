@@ -1,6 +1,6 @@
 # ForeverBroker
 
-ForeverTrader v3.1 — tradingcoach en paper-tradingengine voor WoW Forever EU PvP Alliance.
+ForeverTrader **v3.2.0** — tradingcoach, conservatievere paper-tradingengine en optionele live-goldtest met handmatige transacties voor WoW Forever EU PvP Alliance.
 
 ## Bijwerken (Windows)
 
@@ -18,6 +18,16 @@ Daarna gebruik je bij iedere nieuwe versie alleen:
 ```
 
 Sluit eerst WoW en `START.bat`. De updater bewaart `config.json` en `data/` en vernieuwt, wanneer `wow_folder` is ingesteld, ook de WoW-addon. In een Git-clone gebruikt de updater `git pull --ff-only` (lokale wijzigingen kunnen dat blokkeren).
+
+## Nieuw in 3.2: live-goldtest
+
+- De live-testmodus gebruikt alleen verse in-game AH-prijzen (max. 60 seconden oud), met maximaal **1g per advies**, **5g per sessie**, en minstens **15g of 20% walletreserve**.
+- De gebruiker bevestigt **iedere koop en verkoop zelf** in WoW. Automatisch onbeheerd kopen of verkopen wordt niet uitgevoerd.
+- Bij het uitloggen blijft de laatst bekende echte wallet behouden; afwijkende 0g-exports worden op de desktop gemeld.
+- Paper-modelverkopen vereisen nu twee opeenvolgende gunstige snapshots; de uitkomst is nog altijd een simulatie.
+- Je bestaande SQLite-database en configuratie blijven behouden bij `.\UPDATE.bat`.
+
+Lees de volledige [handleiding Live Test 3.2](docs/LIVE-TEST-3.2.md).
 
 ## Getting started
 
