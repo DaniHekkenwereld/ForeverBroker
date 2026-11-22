@@ -1,4 +1,4 @@
--- ForeverTrader v3.1.2 - read-only companion. No protected actions or movement.
+-- ForeverTrader v3.2.0 - read-only companion. No protected actions or movement.
 local L=ForeverTraderLogic
 local T=ForeverTraderTarget
 local frame=CreateFrame('Frame')
@@ -7,7 +7,7 @@ local function now() return GetServerTime and GetServerTime() or time() end
 local function db() if type(ForeverTraderDB)~='table' then ForeverTraderDB={} end; ForeverTraderDB.schema='FT1';return ForeverTraderDB end
 local function market() return UnitFactionGroup('player') or 'Unknown',tostring(GetCurrentRegion and GetCurrentRegion() or 0) end
 local function realmOK() local a,b=market();return a=='Alliance' and b=='3' and db().pvpConfirmed==true and (not GetRealmName or db().confirmedRealm==GetRealmName()) end
-local s={active=false,mailOpen=false,ahOpen=false,mailKnown=false,ready=0,pending=0,attachments=0,partial=false,cash=0,reserve=150000,threshold=20000,buyCount=0,sellCount=0,mailAlert=false,bought=false}
+local s={active=false,mailOpen=false,ahOpen=false,mailKnown=false,ready=0,pending=0,attachments=0,partial=false,cash=0,reserve=150000,threshold=20000,buyCount=0,sellCount=0,mailAlert=false,bought=false,live=false,liveSpent=0,walletKnown=false}
 local plan,book,bags,buys,sells=nil,{},{},{},{}
 local listed={}
 local targetBook,lastTry={},{}
@@ -24,7 +24,13 @@ local function owned()
     table.sort(rows);db().owned=now()..";"..table.concat(rows,";")
 end
 local function gold(n) return string.format('%.2fg',(n or 0)/10000) end
-local function wallet() local f,r=market();s.cash=GetMoney();db().wallet=string.format('%d|%d|%s|%s',now(),s.cash,f,r) end
+local function wallet()
+    local f,r=market();local money=GetMoney()
+    if type(money)~='number' or money<0 then return end
+    if s.live and s.walletKnown and money<s.cash then s.liveSpent=s.liveSpent+s.cash-money end
+    s.cash=money;s.walletKnown=true
+    db().wallet=string.format('%d|%d|%s|%s',now(),money,f,r)
+end
 local function getBags()
     bags={}; if not C_Container or not C_Container.GetContainerItemInfo then return end
     for bag=0,(NUM_BAG_SLOTS or 4) do for slot=1,C_Container.GetContainerNumSlots(bag) do
@@ -74,18 +80,30 @@ local function scan()
 end
 local ui=CreateFrame('Frame','ForeverTraderCoach',UIParent,'BackdropTemplate');ui:SetSize(430,302);ui:SetPoint('CENTER',UIParent,'CENTER',360,0);ui:SetMovable(true);ui:EnableMouse(true);ui:RegisterForDrag('LeftButton');ui:SetScript('OnDragStart',ui.StartMoving);ui:SetScript('OnDragStop',ui.StopMovingOrSizing)
 ui:SetBackdrop({bgFile='Interface/Tooltips/UI-Tooltip-Background',edgeFile='Interface/Tooltips/UI-Tooltip-Border',edgeSize=14});ui:SetBackdropColor(.04,.06,.09,.96)
-local title=ui:CreateFontString(nil,'OVERLAY','GameFontNormalLarge');title:SetPoint('TOPLEFT',14,-12);title:SetText('ForeverTrader 3.1.2')
+local title=ui:CreateFontString(nil,'OVERLAY','GameFontNormalLarge');title:SetPoint('TOPLEFT',14,-12);title:SetText('ForeverTrader 3.2.0')
 local text=ui:CreateFontString(nil,'OVERLAY','GameFontHighlight');text:SetPoint('TOPLEFT',14,-39);text:SetWidth(402);text:SetJustifyH('LEFT');text:SetJustifyV('TOP')
 local close=CreateFrame('Button',nil,ui,'UIPanelCloseButton');close:SetPoint('TOPRIGHT',0,0)
 local lastCode,lastNotify=nil,0
 local function name(id) return (GetItemInfo and GetItemInfo(id)) or (C_Item and C_Item.GetItemNameByID and C_Item.GetItemNameByID(id)) or ('Item '..id) end
 update=function()
-    wallet();s.market=realmOK();s.reserve=math.max(150000,math.floor(s.cash*.20));s.planValid=plan and now()<plan.expires
+    if not s.loggingOut then wallet() end;s.market=realmOK();s.reserve=math.max(150000,math.floor(s.cash*.20));s.planValid=plan and now()<plan.expires
     s.targetMode=targetMode
     if pending and now()-pending.at>=20 then pending=nil end
     s.searchPending=pending~=nil;s.searchCandidate=not s.buyBlocked and T.choose(plan,targetBook,bags,listed,now(),lastTry) or nil
-    buys,sells=L.matches(plan,targetBook,bags,s.cash,s.reserve,now(),s.scanAt,listed,true);if s.buyBlocked or pending then buys={} end;if pending then sells={} end;s.buyCount=#buys;s.sellCount=#sells
+    local remaining=math.max(0,50000-(s.liveSpent or 0))
+    buys,sells=L.matches(plan,targetBook,bags,s.cash,s.reserve,now(),s.scanAt,listed,true,s.live and math.min(10000,remaining) or nil)
+    if s.buyBlocked or pending then buys={} end;if pending then sells={} end
+    if s.live then
+        local safe={}
+        for _,r in ipairs(buys) do if L.liveAllowed(s,r,targetBook[r.id],now()) then safe[#safe+1]=r end end
+        buys=safe
+    end
+    s.buyCount=#buys;s.sellCount=#sells
     local code,msg=L.next(s,now());local lines={msg,'Gold '..gold(s.cash)..' | Incoming (laatst gezien) '..gold(s.pending)..' | Klaar (laatst gezien) '..gold(s.ready)}
+    if s.live then
+        lines[#lines+1]='LIVE TEST: alleen adviezen, transacties zelf klikken!'
+        lines[#lines+1]='Budget gebruikt '..gold(s.liveSpent)..'/5.00g | max 1g per advies | reserve 15g'
+    end
     if s.partial or (s.unknown or 0)>0 then lines[#lines+1]='Inbox: controleer ook onbekende / overige berichten.' end
     if s.searchCandidate then lines[#lines+1]='Volgende zoekopdracht: '..name(s.searchCandidate.id) end
     if code=='BUY' then for i=1,math.min(3,#buys) do local r=buys[i];lines[#lines+1]=name(r.id)..' x'..r.qty..' | max '..gold(r.max)..'/st | doel '..gold(r.target)..' | hold '..r.hold..'u | live '..gold(targetBook[r.id].floor) end end
@@ -234,7 +252,8 @@ for _,event in ipairs({'PLAYER_LOGIN','PLAYER_LOGOUT','PLAYER_MONEY','MAIL_SHOW'
 frame:SetScript('OnEvent',function(_,e,...)
     local key=...
     check(function()
-        if e=='PLAYER_LOGIN' then ensureAuctionatorListener();s.active=false;plan=L.plan(db().planText,now());getBags();mailSignal();ui:Hide()
+        if e=='PLAYER_LOGIN' then ensureAuctionatorListener();s.loggingOut=false;s.live=false;s.liveSpent=0;s.walletKnown=false;s.active=false;plan=L.plan(db().planText,now());getBags();mailSignal();ui:Hide()
+        elseif e=='PLAYER_LOGOUT' then s.loggingOut=true
         elseif e=='MAIL_SHOW' then s.mailOpen=true;s.mailKnown=false;s.ahOpen=false;if C_Timer and C_Timer.After then C_Timer.After(1,function() if s.mailOpen then check(function() mailbox();update() end) end end) end
         elseif e=='MAIL_INBOX_UPDATE' then mailbox()
         elseif e=='MAIL_CLOSED' then s.mailOpen=false
@@ -264,14 +283,21 @@ button('Zoek volgend',288,function() check(searchNext) end)
 SLASH_FOREVERTRADER1='/ft';SlashCmdList.FOREVERTRADER=function(msg)
     msg=msg:lower():match('^%s*(.-)%s*$');check(function()
         if msg=='start' then s.active=true;ui:Show();mailSignal();getBags();lastCode=nil
-        elseif msg=='stop' then s.active=false;ui:Hide()
+        elseif msg=='live on' then
+            if not s.ahOpen and AuctionHouseFrame and AuctionHouseFrame.IsShown and AuctionHouseFrame:IsShown() then s.ahOpen=true end
+            if not realmOK() or not s.ahOpen or not s.walletKnown then say('Live test alleen met AH open, bevestigde EU Alliance en geladen wallet.');return end
+            s.live=true;s.liveSpent=0;s.active=true;s.buyBlocked=false;ui:Show();lastCode=nil
+            say('Live test AAN: adviezen met 5g sessiebudget en max 1g per item. Kopen/verkopen blijft handmatig.')
+        elseif msg=='live off' then s.live=false;s.liveSpent=0;s.buyBlocked=true;say('Live test UIT. Geen aankopen zonder eigen bevestiging.')
+        elseif msg=='live' then say('Live test '..(s.live and 'AAN' or 'UIT')..'. Gebruik /ft live on of /ft live off. Geen automatische orders.')
+        elseif msg=='stop' then s.active=false;s.live=false;ui:Hide()
         elseif msg=='market' then local f,r=market();if f~='Alliance' or r~='3' then say('Geen EU Alliance.');return end;db().pvpConfirmed=true;db().confirmedRealm=GetRealmName and GetRealmName() or nil;s.market=true;say('PvP door jou bevestigd; controleer dat dit de juiste realm is.')
         elseif msg=='plan' then ui:Show();input:Show();input:SetFocus();say('Plak de FT3-planning uit het dashboard en druk Enter.')
         elseif msg=='bought' or msg=='mail' then s.bought=true;s.buyBlocked=true;targetBook={};lastCode=nil
         elseif msg=='search' then searchNext()
         elseif msg:match('^search %d+$') then searchNext(tonumber(msg:match('%d+')))
         elseif msg=='status' or msg=='' then ui:Show();lastCode=nil
-        else say('/ft start | stop | market | plan | bought | mail | search [itemID] | status');return end
+        else say('/ft start | stop | live on/off | market | plan | bought | mail | search [itemID] | status');return end
         update()
     end)
 end
