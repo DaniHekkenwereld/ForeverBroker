@@ -61,6 +61,13 @@ class DailyWindowsTest(unittest.TestCase):
         p = daily.analyse(self.db, 2589, self.at, self.c, 'demo')
         self.assertFalse(p['eligible'])
 
+    def test_history_import_prioritizes_spread_over_raw_volume(self):
+        liquid_flat={'vol24':100000,'depth5':50000,'history':[100]*24}
+        swing={'vol24':3000,'depth5':1000,'history':[100]*12+[180]*12}
+        self.assertGreater(ft.history_priority(swing,self.c),
+                           ft.history_priority(liquid_flat,self.c))
+        self.assertEqual(ft.history_priority({'vol24':None,'depth5':None},self.c),(0,0))
+
     def test_coach_handoffs_daily_beyond_watchlist(self):
         # Model found a vetted daily window for an imported item not on the old
         # 21-item watchlist; it must be reachable in the in-game FT3 plan.
