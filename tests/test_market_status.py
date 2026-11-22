@@ -22,7 +22,15 @@ class MarketStatusTest(unittest.TestCase):
         trader.setmeta(self.db,'market_last_error','HTTP Error 503')
         self.db.commit()
         self.assertIn('HTTP Error 503',trader.market_wait_status(self.db,self.t+120))
-        self.assertIn('API-aanvraag staat klaar',trader.market_wait_status(self.db,self.t+3600))
+        self.assertIn('API-aanvraag staat klaar',trader.market_wait_status(self.db,trader.next_market_attempt(self.t)))
+    def test_fetch_is_aligned_after_publication_and_hourly_cooldown(self):
+        import datetime as dt
+        start=int(dt.datetime(2026,11,22,12,18,0,tzinfo=dt.timezone.utc).timestamp())
+        due=trader.next_market_attempt(start)
+        self.assertGreaterEqual(due-start,3600)
+        self.assertEqual(dt.datetime.fromtimestamp(due,dt.timezone.utc).minute,27)
+        self.assertEqual(trader.next_market_attempt(due)-due,3600)
+
     def test_existing_snapshot_visible(self):
         self.db.execute('INSERT INTO market_snapshots VALUES (?,?,?,?)',(self.t,self.t,'tk','{}'))
         trader.setmeta(self.db,'market_attempt',self.t)
