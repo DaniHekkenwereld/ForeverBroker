@@ -44,7 +44,16 @@ function L.next(s,now)
     if s.targetMode and (not s.scanAt or now-s.scanAt>=900) then return 'SCAN','Doe een Full Scan met Auctionator als de server dit toestaat.' end
     return 'WAIT','Geen passende actie. Wacht op nieuw mail-signaal of volgende scan.'
 end
-function L.matches(plan,book,bags,cash,reserve,now,scanAt,listed,targetMode)
+-- Read-only live budget advice. Never calls protected Auction House actions.
+function L.liveAllowed(s,row,bookEntry,at)
+    if not s.live or not s.market or not s.ahOpen or not s.walletKnown then return false,'Live test niet actief of wallet onbekend' end
+    if not row or row.monitor or not bookEntry or not bookEntry.at or at<bookEntry.at or at-bookEntry.at>=60 then return false,'Geen verse AH-prijs' end
+    if row.cost<=0 or row.cost>10000 then return false,'Max 1g per aankoopadvies' end
+    if (s.liveSpent or 0)+row.cost>50000 then return false,'Maximaal 5g per testsessie' end
+    if s.cash-row.cost < math.max(150000,math.floor(s.cash*.20)) then return false,'Minimaal 15g reserve' end
+    return true,'Controleer de prijs en bevestig de koop zelf in WoW'
+end
+function L.matches(plan,book,bags,cash,reserve,now,scanAt,listed,targetMode,maxOrderCopper)
     local buys,sells={},{}
     if not plan or now>=plan.expires or (not targetMode and (not scanAt or now-scanAt>=900)) then return buys,sells end
     local spend=math.max(0,cash-reserve)
@@ -52,7 +61,7 @@ function L.matches(plan,book,bags,cash,reserve,now,scanAt,listed,targetMode)
         local b=book[r.id]; if targetMode and (not b or not b.at or now<b.at or now-b.at>=120) then b=nil end; local owned=bags[r.id] or 0
         if not r.monitor and b and b.floor and owned>0 and r.hold==0 and b.floor>=r.target then sells[#sells+1]={id=r.id,qty=owned,target=r.target} end
         if not r.monitor and b and b.floor and b.floor<=r.max and owned==0 and ((listed or {})[r.id] or 0)==0 and spend>0 then
-            local qty,cost=0,0; local cap=math.min(spend,math.floor(cash*.10))
+            local qty,cost=0,0; local cap=math.min(spend,math.floor(cash*.10),maxOrderCopper or math.huge)
             for _,v in ipairs(b.stacks) do
                 if v.cost<=r.max*v.qty then
                     if v.divisible then
