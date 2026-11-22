@@ -141,7 +141,10 @@ def history_priority(x,c):
 def import_history(db,c,m,clock,limit=None):
     # Small rotating watchlist, no bulk crawling. Retry after >=24h, successful history after 7d.
     ranked=sorted((i for i,x in m.items() if not x.get('nc') and x.get('cls') in ('Trade Goods','Consumable','Consumables') and type(x.get('vol24')) is int and x['vol24']>=c['min_daily_volume']),key=lambda i:history_priority(m[i],c),reverse=True)
-    ids=list(dict.fromkeys(c['watchlist']+ranked))[:c['history_max_items']]
+    # Never spend a scarce import attempt on a watchlist entry absent from
+    # this market, or let a dead item block discovery of other candidates.
+    watched=[i for i in c['watchlist'] if i in m and not m[i].get('nc') and type(m[i].get('vol24')) is int and m[i]['vol24']>=c['min_daily_volume']]
+    ids=list(dict.fromkeys(watched+ranked))[:c['history_max_items']]
     done=0
     for i in ids:
         a=db.execute('SELECT attempt,success FROM import_log WHERE item_id=?',(i,)).fetchone()
