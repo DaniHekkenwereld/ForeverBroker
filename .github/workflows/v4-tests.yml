@@ -1,0 +1,29 @@
+name: ForeverTrader V4 tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Syntax
+        run: python -m compileall -q trader.py legacy.py opportunities.py characters.py sync_client.py v4_engine.py v4_server.py v4_bridge.py
+      - name: Python regression suite
+        run: python -m unittest discover -s tests -v
+  lua:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Lua
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq lua5.4
+      - name: Addon integration mock
+        run: lua tests/client_mock.lua
+      - name: V4 session and strategy tests
+        run: lua tests/v4_mock.lua
