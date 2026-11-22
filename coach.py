@@ -49,26 +49,29 @@ def build_plan(db,c,clock,mode):
                 )
         return '',[], 'Geen actuele marktsnapshot en geen geschikte controle-items.'
     rows=db.execute('''SELECT d.*,i.name,i.vendor FROM trade_decisions d JOIN items i ON i.id=d.item_id
-      WHERE d.snapshot=? AND d.strategy IN ('direct','intraday','weekly') AND d.roi IS NOT NULL AND d.confidence>0 AND d.ask>0 AND d.quantity>0
+      WHERE d.snapshot=? AND d.strategy IN ('direct','intraday','weekly','daily') AND d.roi IS NOT NULL AND d.confidence>0 AND d.ask>0 AND d.quantity>0
       AND (d.action='BUY_MODEL' OR d.reason IN ('item occupied','cycle limit','item exposure','cash reserve','strategy cap','minimum net ROI incl deposit risk'))''',(t,)).fetchall()
     out=[];seen=set()
-    # Strictly curated materials. An 'observe' entry is not a buy recommendation.
+    # Daily entries may come from researched high-volume products beyond watchlist.
+    # Prefer absolute expected net profit over tiny high-ROI lots.
     allowed=set(c['watchlist'])
     def priority(r):
-        hold=json.loads(r['details']).get('hold_hours',0)
-        return r['roi']*r['confidence']/(1+hold/12)
+        d=json.loads(r['details']);hold=d.get('hold_hours',0)
+        net=max(0,r['target']-math.ceil(r['target']*c['cut_pct']/100)-r['ask']-int(d.get('deposit_per_unit',0)))
+        return net*min(r['quantity'],10000)*r['confidence']/(1+hold/24)
     for r in sorted(rows,key=priority,reverse=True):
         i=r['item_id'];d=json.loads(r['details']);hold=int(d.get('hold_hours',0)); target=r['target']
-        if i not in allowed or i in seen or target is None or not 0<=hold<=168: continue
+        if (i not in allowed and r['strategy']!='daily') or i in seen or target is None or not 0<=hold<=168: continue
         dep=max(0,int(d.get('deposit_per_unit',0)));net=target-math.ceil(target*c['cut_pct']/100)-dep
-        limit=int(net/(1+c['min_roi_pct']/100)); qty=min(r['quantity'],10000)
+        min_roi=c['daily_min_net_roi_pct'] if r['strategy']=='daily' else c['min_roi_pct']
+        limit=int(net/(1+min_roi/100)); qty=min(r['quantity'],10000)
         live=targeted.latest(db,i,clock)
         if live is not None:
             qty_live,cost_live=targeted.affordable(live,limit,qty)
             if not qty_live: continue
             effective=cost_live/qty_live; roi=(net/effective-1)*100;qty=qty_live
         else:
-            if r['roi']<c['min_roi_pct']:continue
+            if r['roi']<min_roi:continue
             roi=r['roi']
         if not 0<limit<target<=100000000: continue
         out.append(dict(id=i,name=r['name'],max=limit,qty=qty,target=target,hold=hold,strategy=r['strategy'],roi=roi,live=live is not None));seen.add(i)
@@ -82,13 +85,13 @@ def build_plan(db,c,clock,mode):
     if not out: return '',[], 'Nog geen handelsadviezen of geschikte items voor gerichte prijscontrole.'
     expires=t+5400
     payload=encode_plan(out,t,expires)
-    msg=f'{buy_count} koopkansen, {len(out)-buy_count} controle-items. Controle-items geven nooit zelfstandig koopadvies. Prijsreferentie maximaal 90 min geldig.'
+    msg=f'{buy_count} koopkansen, {len(out)-buy_count} controle-items. Controle-items geven nooit zelfstandig koopadvies. Publieke prijsreferentie maximaal 90 min geldig; live AH-controle verplicht.'
     return payload,out,msg
 
 def panel(db,c,clock,mode):
     payload,rows,msg=build_plan(db,c,clock,mode); e=html.escape
     lines=''.join(f'<tr><td>{e(str(r["name"]))}</td><td>{r["qty"]}</td><td>{r["max"]}</td><td>{r["target"]}</td><td>{r["hold"]}</td><td>{e(r["strategy"])}</td><td>{"Oude snapshot" if r.get("stale") else ("LIVE" if r["live"] else "Historisch")}</td><td>{"—" if r["roi"] is None else f"{r['roi']:.1f}%"}</td></tr>' for r in rows)
-    return f'''<section class="notice"><h2 style="margin-top:0">In-game handelscoach</h2><p>{e(msg)}</p><p>Open WoW: /ft start, /ft market (eenmalig), /ft plan. Kopieer onderstaande regel, plak in het invoerveld in WoW en druk Enter. Ververs de lijst na nieuwe marktdata. De coach gebruikt direct de verse in-game prijzen; desktop leest die na reload/logout. De coach gebruikt echte wallet, zichtbare mail, bags en gerichte AH-zoekresultaten, maximaal 2 min oud; geen automatische orders.</p><textarea id="coachplan" readonly rows="3" style="width:98%" onclick="this.select()">{e(payload)}</textarea><button onclick="document.getElementById('coachplan').select();navigator.clipboard?.writeText(document.getElementById('coachplan').value).catch(()=>{{}})">Selecteer / kopieer planning</button><p>Prijzen per stuk in copper. Regels met strategie monitor zijn alleen voor gerichte prijscontrole (geen koopadvies).</p><table><tr><th>Item</th><th>Max stuks</th><th>Max koop</th><th>Doel</th><th>Hold uren</th><th>Strategie</th><th>Bron</th><th>ROI</th></tr>{lines}</table></section>'''
+    return f'''<section class="notice"><h2 style="margin-top:0">In-game handelscoach</h2><p>{e(msg)}</p><p>Open WoW: /ft start, /ft market (eenmalig), /ft plan. Kopieer onderstaande regel, plak in het invoerveld in WoW en druk Enter. Ververs de lijst na nieuwe marktdata. De coach gebruikt direct de verse in-game prijzen; desktop leest die na reload/logout. De coach gebruikt echte wallet, zichtbare mail, bags en gerichte AH-zoekresultaten, maximaal 2 min oud; geen automatische orders.</p><textarea id="coachplan" readonly rows="3" style="width:98%" onclick="this.select()">{e(payload)}</textarea><button onclick="document.getElementById('coachplan').select();navigator.clipboard?.writeText(document.getElementById('coachplan').value).catch(()=>{{}})">Selecteer / kopieer planning</button><p>Prijzen per stuk in copper. Regels met strategie monitor zijn alleen voor gerichte prijscontrole (geen koopadvies).</p><table><tr><th>Item</th><th>Max stuks</th><th>Max koop</th><th>Doel</th><th>Hold uren</th><th>Strategie</th><th>Bron</th><th>ROI</th></tr>{lines}</table><p>Daghandel is een modeladvies op basis van afgeronde historische dagen. De doelprijs is geen gegarandeerde verkoop.</p></section>'''
 
 def extras(text):
     """Constrained read only parser for new optional strings; never runs Lua."""
