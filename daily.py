@@ -81,7 +81,9 @@ def analyse(db, item_id, asof, config, source='tk'):
                         conservative_net_roi=safe_roi, confidence=confidence,
                         target=target, ceiling=ceiling, eligible=eligible,
                         baseline=baseline, asof=asof)
-            score = (safe_roi if eligible else median_roi) * win * min(len(pairs), 14) / 7
+            # Prefer validated windows; otherwise display the best observed
+            # (explicitly unvalidated) median spread instead of arbitrary ties.
+            score = (int(eligible), safe_roi if eligible else median_roi, win, len(pairs))
             if best is None or score > best[0]:
                 best = (score, plan)
     return best[1] if best else None
