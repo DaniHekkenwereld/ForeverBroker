@@ -102,6 +102,59 @@ update=function()
     end
 end
 local function check(fn) local ok,err=pcall(fn);if not ok then say('Fout: '..tostring(err)) end end
+-- Auctionator's default Full Scan is an IncrementalScan (browse summary), not
+-- a Blizzard replicate scan. Read its completed result payload rather than guessing
+-- whether an arbitrary BrowseQuery was truly a full-market scan.
+local auctionatorListener
+local function readAuctionatorSummary(rawScan)
+    if type(rawScan)~='table' or not s.ahOpen or not realmOK() then return end
+    local rows,count={},0
+    -- This summary reports a minimum UNIT price and aggregate quantity; it is
+    -- not a set of executable per-listing buyouts. Never feed it to L.matches.
+    for _,r in ipairs(rawScan) do
+        local k=type(r)=='table' and r.itemKey
+        local id=k and k.itemID
+        local price=r and r.minPrice
+        local qty=r and r.totalQuantity
+        if type(id)=='number' and id>0 and type(price)=='number' and price>0 and type(qty)=='number' and qty>0
+           and (k.itemLevel or 0)==0 and (k.itemSuffix or 0)==0 and (k.battlePetSpeciesID or 0)==0 then
+            rows[#rows+1]=string.format('%d:%d:%d',id,math.floor(price),math.floor(qty))
+            count=count+1
+        end
+    end
+    if count==0 then say('Auctionator-scan voltooid, maar geen bruikbare basisitemprijzen.');return end
+    local t=now()
+    db().browseSummary=t..';'..table.concat(rows,';')
+    s.scanAt=t
+    say('Auctionator summary-scan ontvangen: '..count..' items (alleen prijsreferenties).')
+    update()
+end
+local function registerAuctionatorScan()
+    local a=Auctionator
+    local inc=a and a.IncrementalScan
+    local bus=a and a.EventBus
+    if not bus or not bus.Register or not inc or not inc.Events or not inc.Events.ScanComplete then
+        return false
+    end
+    auctionatorListener={ReceiveEvent=function(_,event,rawScan)
+        local ok,err=pcall(readAuctionatorSummary,rawScan)
+        if not ok then say('Auctionator scanfout: '..tostring(err)) end
+    end}
+    bus:Register(auctionatorListener,{inc.Events.ScanComplete})
+    return true
+end
+-- OptionalDeps ensures Auctionator loads before us. If it is loaded only after
+-- our addon, try once more at PLAYER_LOGIN.
+local registeredAuctionator=false
+local function ensureAuctionatorListener()
+    if not registeredAuctionator then
+        local ok,res=pcall(registerAuctionatorScan)
+        registeredAuctionator=(ok and res==true)
+        if not ok then say('Auctionator-koppeling mislukt: '..tostring(res)) end
+    end
+end
+ensureAuctionatorListener()
+
 local function browseSummary()
     local a=C_AuctionHouse
     if not browseFull or not s.ahOpen or not realmOK() or not a or not a.HasFullBrowseResults or not a.GetBrowseResults or not a.HasFullBrowseResults() then return end
@@ -172,7 +225,7 @@ for _,event in ipairs({'PLAYER_LOGIN','PLAYER_LOGOUT','PLAYER_MONEY','MAIL_SHOW'
 frame:SetScript('OnEvent',function(_,e,...)
     local key=...
     check(function()
-        if e=='PLAYER_LOGIN' then s.active=false;plan=L.plan(db().planText,now());getBags();mailSignal();ui:Hide()
+        if e=='PLAYER_LOGIN' then ensureAuctionatorListener();s.active=false;plan=L.plan(db().planText,now());getBags();mailSignal();ui:Hide()
         elseif e=='MAIL_SHOW' then s.mailOpen=true;s.mailKnown=false;s.ahOpen=false;if C_Timer and C_Timer.After then C_Timer.After(1,function() if s.mailOpen then check(function() mailbox();update() end) end end) end
         elseif e=='MAIL_INBOX_UPDATE' then mailbox()
         elseif e=='MAIL_CLOSED' then s.mailOpen=false
