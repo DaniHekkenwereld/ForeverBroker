@@ -404,6 +404,23 @@ def dashboard(db,folder,c,clock,status,localmsg,m,mode):
     body=f'''<!doctype html><html lang="nl"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="refresh" content="30"><title>ForeverTrader 3.1.1</title><style>body{{font:15px system-ui;background:#101720;color:#e7eef6;margin:auto;padding:24px;max-width:1450px}}h1{{font-size:32px;margin:0}}h2{{font-size:19px;margin-top:28px}}p,small{{color:#a8b6c7}}a{{color:#90caf9}}.grid{{display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:10px}}.metric{{padding:14px;background:#202c3a;border-radius:8px}}strong{{display:block;color:#e9c172;font-size:22px}}.scroll{{overflow:auto;max-height:450px}}table{{border-collapse:collapse;width:100%;background:#192432}}th,td{{padding:9px;border-bottom:1px solid #334155;text-align:left;white-space:nowrap}}th{{position:sticky;top:0;background:#263547}}.notice{{border-left:4px solid #e9c172;padding:12px;background:#1b2936}}nav a{{margin-right:14px}}</style><h1>ForeverTrader 3.1.1</h1><p>EU PvP Alliance · {old.esc('FICTIEVE DEMO' if mode=='demo' else 'PAPER TRADING · geen echte orders')} · {old.stamp(clock)}</p><nav><a href="#signals">Signalen</a><a href="#patterns">Patronen</a><a href="#research">Research</a><a href="#diagnostic">Diagnostiek</a></nav><p class="notice">{old.esc(status)}<br>{old.esc(localmsg)}<br>{old.esc(coverage_text)}</p><div class="grid">{cards}</div>{coach.panel(db,c,clock,mode)}<p>Kapitaal op kostprijs; onverkochte voorraad is geen beschikbare cash. Modelverkopen zijn geen bevestigde echte verkopen.</p><h2>Gerichte itemzoekopdrachten</h2><p>Eigen AH-observaties, apart van publieke historie. Bij reload/logout naar desktop. Geen bewezen verkoopvolume of paper fills.</p>{table(['Tijd UTC','ItemID','Type','Laagste / stuk c','Aantal','Regels'],targetrows)}<h2 id="signals">Handelsbeslissingen</h2>{table(['Tijd','Item','Strategie','Actie','Reden','Koop c','Doel c','Aantal','ROI %'],dec)}<h2>Recente beoordeelde signalen</h2>{table(['Item','Strategie','Reden','Koop c','Doel c','ROI %','Heuristische score'],signals)}<h2>Voorraad</h2>{table(['Item','Strategie','Aantal','Kostprijs','Doel c','Status','Plaatsen','Verloopt'],[(r['name'],r['strategy'],r['qty'],old.gold(r['cost']),r['target'],r['status'],old.stamp(r['list_at']),old.stamp(r['expires'])) for r in db.execute('SELECT * FROM inventory')])}<h2>Incoming gold</h2>{table(['ItemID','Bedrag','Verwacht','Strategie'],[(r['item_id'],old.gold(r['amount']),old.stamp(r['eta']),r['strategy']) for r in db.execute('SELECT * FROM incoming')])}<h2>Resultaat per strategie</h2>{table(['Strategie','Events','Gerealiseerd copper','Modelverkopen'],strat)}<h2>Voorspelling versus resultaat (afgeronde modelorders)</h2>{table(['Strategie','Afgerond','Werkelijk c','Verwacht c','Gem. fout c','ROI %','Gem. uren'],perf)}<h2 id="patterns">Prijsprofielen (ratio t.o.v. baseline)</h2><p>Uur 0–23 lokale tijd; weekly bucket 0 = resetdag. Alleen eerdere afgeronde periodes.</p>{table(['Item','Model','Bucket','Samples','Ratio'],pat)}<h2 id="research">Populatie radar</h2><p>CSV-import, geen directe live census-API. Verandering in waargenomen characters, geen bewijs van vraag.</p>{table(['Level','Characters','Groei %','Laatste','Gekoppelde items'],pp)}<h2>Content kalender</h2>{table(['Tijd UTC','Event','Type','Bron'],ev)}<h2>Crafting radar (indicatief)</h2>{table(['Recept ID','Recept','Profession','Kosten c','Winst c','ROI %','Vol24'],[(i,n,p,cost,profit,round(roi,1),vol) for i,n,p,cost,profit,roi,vol in cr])}<h2>Backtests</h2>{table(['Type','Resultaat'],back)}<h2 id="diagnostic">Historische imports</h2>{table(['ItemID','Status','Succes UTC'],imp)}<h2>Fouten</h2>{table(['Tijd UTC','Component','Melding'],errors)}<h2>Diagnostiek</h2><p>Start EXPORT-DIAGNOSTICS.bat voor een consistente ZIP van database en logs. Een bestaande export: <a href="ForeverTrader-Diagnostics.zip">download</a> (alleen na export). Bronnen: <a href="https://auctionhouse.tk.gg/data/">TK Auction House</a> · <a href="https://classicarmory.gg/forever/census">Classic Armory Census</a>. Externe gegevens zijn niet realtime. Prijzen in copper tenzij anders vermeld.</p></html>'''
     old.atomic(folder/'dashboard.html',body)
 
+def market_wait_status(db, clock):
+    """Show the persisted fetch cooldown and last result, even after a restart.
+
+    The whole-market provider permits hourly polling; don't silently retry it on
+    every 30-second dashboard refresh or after restarting the application.
+    """
+    last_attempt = getmeta(db, 'market_attempt', 0)
+    last_error = getmeta(db, 'market_last_error', '')
+    latest = db.execute('SELECT t FROM market_snapshots ORDER BY t DESC LIMIT 1').fetchone()
+    last = f"Laatste opgeslagen snapshot: {old.stamp(latest['t'])}" if latest else 'Nog geen opgeslagen marktdata'
+    if last_attempt and clock < last_attempt + 3600:
+        next_at = old.stamp(last_attempt + 3600)
+        if last_error:
+            return f"{last} | Laatste API-fout: {last_error} | Nieuwe poging: {next_at}"
+        return f"{last} | Volgende API-poging: {next_at} (max. 1x/uur)"
+    return f"{last} | API-aanvraag staat klaar"
+
 def main():
     p=argparse.ArgumentParser(); p.add_argument('--demo',action='store_true'); p.add_argument('--once',action='store_true'); p.add_argument('--no-browser',action='store_true'); p.add_argument('--ahl',action='store_true',help='legacy flag; no persistent AHledger data'); p.add_argument('--export',action='store_true'); p.add_argument('--backtest',action='store_true'); p.add_argument('--population'); p.add_argument('--events'); p.add_argument('--history-only',action='store_true'); args=p.parse_args()
     c=conf(); mode='demo' if args.demo else 'paper'; folder=ROOT/'data'/mode; db=connect(folder/'trader.sqlite'); vid=register(db,c); db.commit()
@@ -416,7 +433,7 @@ def main():
     try:
         if args.population: print('Imported',import_population(db,args.population)); return
         if args.events: import_events(db,args.events); print('Events imported');return
-        row=db.execute('SELECT * FROM market_snapshots ORDER BY t DESC LIMIT 1').fetchone(); m={int(k):v for k,v in json.loads(row['payload']).items()} if row else {}; status='Wachten op marktdata'; opened=False
+        row=db.execute('SELECT * FROM market_snapshots ORDER BY t DESC LIMIT 1').fetchone(); m={int(k):v for k,v in json.loads(row['payload']).items()} if row else {}; status=market_wait_status(db,old.now()); opened=False
         if args.backtest:
             for kind,val in [('price_target',history_backtest(db,c)),('recorded_replay',replay(db,c))]:
                 db.execute('INSERT INTO backtest_results(t,kind,details) VALUES(?,?,?)',(old.now(),kind,D(val))); print(kind,D(val))
@@ -436,8 +453,12 @@ def main():
                     if fresh and t>=getmeta(db,'last_trade_snapshot',0):m=new
                     else:fresh=False
                     status=f"Snapshot {old.stamp(t)} | {len(new)} items | {'new' if fresh else 'duplicate/old'}"
+                    setmeta(db,'market_last_error','')
                     db.commit()
-                except Exception as e: db.rollback(); log(db,clock,'market',e);status=f'Markt ophalen mislukt: {e}';db.commit();fresh=False
+                except Exception as e:
+                    db.rollback(); log(db,clock,'market',e); setmeta(db,'market_last_error',str(e)[:300]);status=f'Markt ophalen mislukt: {e} | Volgende poging na 1 uur';db.commit();fresh=False
+            else:
+                status=market_wait_status(db,clock)
             try:
                 with db:
                     settle(db,clock)
