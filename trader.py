@@ -129,7 +129,7 @@ def history_priority(x,c):
     vals=sorted(v for v in x.get('history',[]) if type(v) is int and v>0)
     if (type(volume) is not int or type(depth) is not int or
         volume<c['min_daily_volume'] or depth<=0 or len(vals)<12):
-        return (0,max(0,volume or 0))
+        return (0,volume if type(volume) is int and volume>0 else 0)
     low=vals[len(vals)//4];high=vals[(len(vals)*3)//4]
     net=max(0,high-math.ceil(high*c['cut_pct']/100)-low)
     item_pct=c.get('daily_item_pct',35)
