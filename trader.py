@@ -259,12 +259,16 @@ def cycle(db,c,t,m,clock,vid,source='tk'):
                 decision(db,clock,t,i,strategy,'SKIP','holding horizon limit',vid,ask,target,depth,confidence=confidence,details=detail); continue
             proceeds=target-math.ceil(target*c['cut_pct']/100); dep=math.ceil(ven*c['deposit_vendor_pct']/100); roi=(proceeds-ask-dep)/ask*100
             detail.update({'vol24':v,'depth5':depth,'deposit_per_unit':dep,'hold_hours':hold,'fee_pct':c['cut_pct'],'net_sale_per_unit':proceeds})
-            if roi<c['min_roi_pct']:
+            min_roi=c['daily_min_net_roi_pct'] if strategy=='daily' else c['min_roi_pct']
+            if roi<min_roi:
                 decision(db,clock,t,i,strategy,'SKIP','minimum net ROI incl deposit risk',vid,ask,target,depth,roi,confidence,detail); continue
             qty=(min(depth,max(1,v//6)) if strategy=='daily' else
                  depth if strategy=='direct' else min(depth if ask2*100>ask*105 else 1,max(1,v//24)))
             # Rank by expected NET copper after fees, adjusted for confidence.
-            value=max(0,proceeds-ask-dep)*qty
+            item_pct=c['daily_item_pct'] if strategy=='daily' else c['max_item_pct']
+            equity=totals(db)['equity']
+            rank_qty=min(qty,int(equity*item_pct/100/(ask+dep)))
+            value=max(0,proceeds-ask-dep)*max(0,rank_qty)
             score=value*confidence/(1+hold/24)
             proposals.append((score,i,strategy,target,hold,confidence,detail,ask,qty,dep,proceeds,roi))
         if i not in direct and len(proposals)==before_proposals: decision(db,clock,t,i,'screen','SKIP','no eligible signal',vid,ask=ask)
