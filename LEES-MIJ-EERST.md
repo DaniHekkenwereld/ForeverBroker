@@ -1,4 +1,16 @@
-# ForeverTrader 3.4 – Getting started
+# ForeverTrader 4.0 — Begin hier
+
+## Nieuwe 24/7-serverstrategie
+
+De **v4-server** houdt alle publieke AH-items en historische prijzen bij, ook als je niet ingelogd bent. De **Windows-bridge** verstuurt je laatst opgeslagen sessies na uitloggen en zet de nieuwe strategie voor ieder character klaar zodra WoW volledig gesloten is. Bij de volgende start laadt de addon die automatisch.
+
+Je moet hiervoor eerst de VPS met HTTPS en de privétoegang instellen. Volg de [V4-installatiehandleiding](docs/FOREVERTRADER-V4.md). Op Windows gebruik je daarna `PREPARE-V4.bat` en `INSTALL-V4-BRIDGE.bat`. Open de resultaten met `OPEN-V4-DASHBOARD.bat`. In-game: `/ft v4` en aan het AH `/ft auto on`.
+
+**Huidige status:** code staat in de repository; de VPS en de volledige server↔pc↔WoW-cyclus zijn nog niet live uitgerold of gecontroleerd. De addon koopt/verkoopt nog niets automatisch. Sluit `START.bat` op de VPS en gebruik `v4_server.py` voor de 24/7 server. Eerdere `START.bat` op de pc blijft een aparte paper-omgeving.
+
+## Oudere functies
+
+
 
 ## 3.4: alle itemcategorieën scannen
 
