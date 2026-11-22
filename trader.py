@@ -6,7 +6,7 @@ import legacy as old
 import coach
 import targeted
 ROOT=pathlib.Path(__file__).resolve().parent
-VERSION='3.1.2'; MARKET=old.MARKET; BASE='https://auctionhouse.tk.gg/api'
+VERSION='3.2.0'; MARKET=old.MARKET; BASE='https://auctionhouse.tk.gg/api'
 UTC=dt.timezone.utc
 D=lambda x: json.dumps(x,ensure_ascii=False,sort_keys=True,separators=(',',':'))
 SCHEMA='''
@@ -27,6 +27,7 @@ CREATE TABLE IF NOT EXISTS trade_decisions(id INTEGER PRIMARY KEY,t INTEGER,snap
 CREATE TABLE IF NOT EXISTS predictions(id INTEGER PRIMARY KEY,decision_id INTEGER,t INTEGER,horizon INTEGER,target INTEGER,expected_profit INTEGER,confidence REAL,outcome TEXT,actual_profit INTEGER,resolved INTEGER);
 CREATE TABLE IF NOT EXISTS inventory(id TEXT PRIMARY KEY,item_id INTEGER,name TEXT,strategy TEXT,qty INTEGER,cost INTEGER,deposit INTEGER,target INTEGER,proceeds INTEGER,bought INTEGER,list_at INTEGER,expires INTEGER,status TEXT,decision_id INTEGER);
 CREATE TABLE IF NOT EXISTS incoming(id TEXT PRIMARY KEY,item_id INTEGER,amount INTEGER,eta INTEGER,strategy TEXT);
+CREATE TABLE IF NOT EXISTS paper_sale_checks(lot_id TEXT PRIMARY KEY,first_t INTEGER NOT NULL,last_t INTEGER NOT NULL,consecutive INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS transactions(id INTEGER PRIMARY KEY,t INTEGER,lot_id TEXT,item_id INTEGER,strategy TEXT,action TEXT,cash_delta INTEGER,profit INTEGER,qty INTEGER,details TEXT);
 CREATE TABLE IF NOT EXISTS cashflow(t INTEGER PRIMARY KEY,cash INTEGER,inventory INTEGER,listed INTEGER,incoming INTEGER,realized INTEGER,equity INTEGER);
 CREATE TABLE IF NOT EXISTS error_logs(id INTEGER PRIMARY KEY,t INTEGER,level TEXT,component TEXT,message TEXT);
@@ -187,7 +188,7 @@ def settle(db,t):
     for r in db.execute('SELECT * FROM incoming WHERE eta<=?',(t,)).fetchall():
         a=dict(r); ledger(db,t,a,'MAIL',a['amount']); db.execute('DELETE FROM incoming WHERE id=?',(a['id'],))
     for r in db.execute("SELECT * FROM inventory WHERE status='listed' AND expires<=?",(t,)).fetchall():
-        a=dict(r); ledger(db,t,a,'EXPIRE',profit=-a['deposit']); resolve(db,a,t,'expired',-a['deposit']); db.execute("UPDATE inventory SET status='held',deposit=0 WHERE id=?",(a['id'],))
+        a=dict(r); ledger(db,t,a,'EXPIRE',profit=-a['deposit']); resolve(db,a,t,'expired',-a['deposit']); db.execute("UPDATE inventory SET status='held',deposit=0 WHERE id=?",(a['id'],)); db.execute('DELETE FROM paper_sale_checks WHERE lot_id=?',(a['id'],))
 def mark_cash(db,t):
     a=totals(db); db.execute('INSERT OR REPLACE INTO cashflow VALUES(?,?,?,?,?,?,?)',(t,a['cash'],a['inventory'],a['listed'],a['incoming'],a['realized'],a['equity']))
     if a['cash']<0 or a['equity']!=getmeta(db,'starting')+a['realized']: raise RuntimeError(f'Ledger invariant failed: {a}')
@@ -203,8 +204,26 @@ def cycle(db,c,t,m,clock,vid,source='tk'):
         a=dict(r); x=m.get(a['item_id'],{}); units=x.get('sold');
         if units is None and x.get('volume_history'): units=x['volume_history'][-1]
         if units is None and source=='demo': units=100
-        if t-getmeta(db,'last_trade_snapshot',0)>9000 or t-3600<a['list_at'] or t>=a['expires'] or type(units) is not int or units//10<a['qty'] or type(x.get('ask')) is not int or x['ask']<a['target']: continue
-        amount=a['proceeds']*a['qty']+a['deposit']; profit=amount-a['cost']-a['deposit']; ledger(db,clock,a,'SELL_MODEL',profit=profit,detail={'observed_ask':x['ask'],'inferred_sold':units,'target':a['target']}); db.execute('INSERT INTO incoming VALUES(?,?,?,?,?)',(a['id'],a['item_id'],amount,clock+int(c['mail_delay_minutes']*60),a['strategy'])); resolve(db,a,clock,'model_sold',profit); db.execute('DELETE FROM inventory WHERE id=?',(a['id'],))
+        # One public asking-price snapshot is NOT evidence our own listing sold.
+        # Require two independent consecutive hourly quotes above target; this
+        # remains a hypothetical paper fill, not a real confirmed sale.
+        eligible=(t-getmeta(db,'last_trade_snapshot',0)<=9000 and t-3600>=a['list_at']
+                  and t<a['expires'] and type(units) is int and units//10>=a['qty']
+                  and type(x.get('ask')) is int and x['ask']>=a['target'])
+        if not eligible:
+            db.execute('DELETE FROM paper_sale_checks WHERE lot_id=?',(a['id'],))
+            continue
+        seen=db.execute('SELECT last_t,consecutive FROM paper_sale_checks WHERE lot_id=?',(a['id'],)).fetchone()
+        confirmed=(seen is not None and 1800<=t-seen['last_t']<=9000 and seen['consecutive']>=1)
+        if not confirmed:
+            db.execute('INSERT OR REPLACE INTO paper_sale_checks VALUES (?,?,?,?)',(a['id'],t,t,1))
+            continue
+        amount=a['proceeds']*a['qty']+a['deposit']; profit=amount-a['cost']-a['deposit']
+        ledger(db,clock,a,'SELL_MODEL',profit=profit,detail={'observed_ask':x['ask'],'inferred_sold':units,'target':a['target'],'model_fill':'two_consecutive_quotes_no_real_execution'})
+        db.execute('INSERT INTO incoming VALUES(?,?,?,?,?)',(a['id'],a['item_id'],amount,clock+int(c['mail_delay_minutes']*60),a['strategy']))
+        resolve(db,a,clock,'model_sold',profit)
+        db.execute('DELETE FROM paper_sale_checks WHERE lot_id=?',(a['id'],))
+        db.execute('DELETE FROM inventory WHERE id=?',(a['id'],))
     for r in db.execute("SELECT * FROM inventory WHERE status='held' AND list_at<=? AND expires>?",(clock,clock)).fetchall():
         a=dict(r); dep=a['deposit'];
         if getmeta(db,'cash')<dep: continue
@@ -328,6 +347,18 @@ def capture_local(db,c,clock):
                         if k=='browseSummary':
                             msg+=f' | Auctionator summary: {v.count(";")} itemregels ({old.stamp(t)}), alleen marktobservaties'
         except OSError as e: log(db,clock,'coach export',e)
+    # GetMoney can become 0g during logout teardown; don't silently treat
+    # that as confirmed real budget when the coach recently saw a balance.
+    recent=db.execute("SELECT t,payload FROM local_exports WHERE kind='coach' ORDER BY t DESC LIMIT 1").fetchone()
+    wallet=db.execute("SELECT t,payload FROM local_exports WHERE kind='wallet' ORDER BY t DESC LIMIT 1").fetchone()
+    if recent and wallet and 0<=wallet['t']-recent['t']<=120:
+        try:
+            values=json.loads(recent['payload']).split('|')
+            amount=int(values[2])
+            saved=json.loads(wallet['payload'])[1]
+            if saved==0 and amount>0:
+                msg+=f' | WAARSCHUWING: wallet-export 0g bij logout; coach registreerde {old.gold(amount)}. Niet gebruiken als live koopbudget.'
+        except (TypeError,ValueError,KeyError,IndexError): pass
     return msg
 
 def demo(db,c,t,step):
@@ -404,7 +435,7 @@ def dashboard(db,folder,c,clock,status,localmsg,m,mode):
     back=db.execute('SELECT kind,details FROM backtest_results ORDER BY id DESC LIMIT 4'); errors=db.execute('SELECT t,component,message FROM error_logs ORDER BY id DESC LIMIT 10'); imp=db.execute('SELECT item_id,detail,success FROM import_log ORDER BY attempt DESC LIMIT 30')
     perf=strategy_stats(db); pp=population_radar(db,clock); cr=crafting_radar(db,m,c,clock) if clock-getmeta(db,'last_trade_snapshot',0)<=c['max_snapshot_age_minutes']*60 else []; ev=db.execute('SELECT t,name,kind,source FROM game_events WHERE t>=? ORDER BY t LIMIT 20',(clock-7*86400,))
     targetrows=db.execute('SELECT t,item_id,kind,ask,units,rows FROM targeted_observations ORDER BY t DESC,rowid DESC LIMIT 100').fetchall()
-    body=f'''<!doctype html><html lang="nl"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="refresh" content="30"><title>ForeverTrader 3.1.2</title><style>body{{font:15px system-ui;background:#101720;color:#e7eef6;margin:auto;padding:24px;max-width:1450px}}h1{{font-size:32px;margin:0}}h2{{font-size:19px;margin-top:28px}}p,small{{color:#a8b6c7}}a{{color:#90caf9}}.grid{{display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:10px}}.metric{{padding:14px;background:#202c3a;border-radius:8px}}strong{{display:block;color:#e9c172;font-size:22px}}.scroll{{overflow:auto;max-height:450px}}table{{border-collapse:collapse;width:100%;background:#192432}}th,td{{padding:9px;border-bottom:1px solid #334155;text-align:left;white-space:nowrap}}th{{position:sticky;top:0;background:#263547}}.notice{{border-left:4px solid #e9c172;padding:12px;background:#1b2936}}nav a{{margin-right:14px}}</style><h1>ForeverTrader 3.1.2</h1><p>EU PvP Alliance · {old.esc('FICTIEVE DEMO' if mode=='demo' else 'PAPER TRADING · geen echte orders')} · {old.stamp(clock)}</p><nav><a href="#signals">Signalen</a><a href="#patterns">Patronen</a><a href="#research">Research</a><a href="#diagnostic">Diagnostiek</a></nav><p class="notice">{old.esc(status)}<br>{old.esc(localmsg)}<br>{old.esc(coverage_text)}</p><div class="grid">{cards}</div>{coach.panel(db,c,clock,mode)}<p>Kapitaal op kostprijs; onverkochte voorraad is geen beschikbare cash. Modelverkopen zijn geen bevestigde echte verkopen.</p><h2>Gerichte itemzoekopdrachten</h2><p>Eigen AH-observaties, apart van publieke historie. Bij reload/logout naar desktop. Geen bewezen verkoopvolume of paper fills.</p>{table(['Tijd UTC','ItemID','Type','Laagste / stuk c','Aantal','Regels'],targetrows)}<h2 id="signals">Handelsbeslissingen</h2>{table(['Tijd','Item','Strategie','Actie','Reden','Koop c','Doel c','Aantal','ROI %'],dec)}<h2>Recente beoordeelde signalen</h2>{table(['Item','Strategie','Reden','Koop c','Doel c','ROI %','Heuristische score'],signals)}<h2>Voorraad</h2>{table(['Item','Strategie','Aantal','Kostprijs','Doel c','Status','Plaatsen','Verloopt'],[(r['name'],r['strategy'],r['qty'],old.gold(r['cost']),r['target'],r['status'],old.stamp(r['list_at']),old.stamp(r['expires'])) for r in db.execute('SELECT * FROM inventory')])}<h2>Incoming gold</h2>{table(['ItemID','Bedrag','Verwacht','Strategie'],[(r['item_id'],old.gold(r['amount']),old.stamp(r['eta']),r['strategy']) for r in db.execute('SELECT * FROM incoming')])}<h2>Resultaat per strategie</h2>{table(['Strategie','Events','Gerealiseerd copper','Modelverkopen'],strat)}<h2>Voorspelling versus resultaat (afgeronde modelorders)</h2>{table(['Strategie','Afgerond','Werkelijk c','Verwacht c','Gem. fout c','ROI %','Gem. uren'],perf)}<h2 id="patterns">Prijsprofielen (ratio t.o.v. baseline)</h2><p>Uur 0–23 lokale tijd; weekly bucket 0 = resetdag. Alleen eerdere afgeronde periodes.</p>{table(['Item','Model','Bucket','Samples','Ratio'],pat)}<h2 id="research">Populatie radar</h2><p>CSV-import, geen directe live census-API. Verandering in waargenomen characters, geen bewijs van vraag.</p>{table(['Level','Characters','Groei %','Laatste','Gekoppelde items'],pp)}<h2>Content kalender</h2>{table(['Tijd UTC','Event','Type','Bron'],ev)}<h2>Crafting radar (indicatief)</h2>{table(['Recept ID','Recept','Profession','Kosten c','Winst c','ROI %','Vol24'],[(i,n,p,cost,profit,round(roi,1),vol) for i,n,p,cost,profit,roi,vol in cr])}<h2>Backtests</h2>{table(['Type','Resultaat'],back)}<h2 id="diagnostic">Historische imports</h2>{table(['ItemID','Status','Succes UTC'],imp)}<h2>Fouten</h2>{table(['Tijd UTC','Component','Melding'],errors)}<h2>Diagnostiek</h2><p>Start EXPORT-DIAGNOSTICS.bat voor een consistente ZIP van database en logs. Een bestaande export: <a href="ForeverTrader-Diagnostics.zip">download</a> (alleen na export). Bronnen: <a href="https://auctionhouse.tk.gg/data/">TK Auction House</a> · <a href="https://classicarmory.gg/forever/census">Classic Armory Census</a>. Externe gegevens zijn niet realtime. Prijzen in copper tenzij anders vermeld.</p></html>'''
+    body=f'''<!doctype html><html lang="nl"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="refresh" content="30"><title>ForeverTrader 3.2.0</title><style>body{{font:15px system-ui;background:#101720;color:#e7eef6;margin:auto;padding:24px;max-width:1450px}}h1{{font-size:32px;margin:0}}h2{{font-size:19px;margin-top:28px}}p,small{{color:#a8b6c7}}a{{color:#90caf9}}.grid{{display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:10px}}.metric{{padding:14px;background:#202c3a;border-radius:8px}}strong{{display:block;color:#e9c172;font-size:22px}}.scroll{{overflow:auto;max-height:450px}}table{{border-collapse:collapse;width:100%;background:#192432}}th,td{{padding:9px;border-bottom:1px solid #334155;text-align:left;white-space:nowrap}}th{{position:sticky;top:0;background:#263547}}.notice{{border-left:4px solid #e9c172;padding:12px;background:#1b2936}}nav a{{margin-right:14px}}</style><h1>ForeverTrader 3.2.0</h1><p>EU PvP Alliance · {old.esc('FICTIEVE DEMO' if mode=='demo' else 'PAPER TRADING · geen echte orders')} · {old.stamp(clock)}</p><nav><a href="#signals">Signalen</a><a href="#patterns">Patronen</a><a href="#research">Research</a><a href="#diagnostic">Diagnostiek</a></nav><p class="notice">{old.esc(status)}<br>{old.esc(localmsg)}<br>{old.esc(coverage_text)}</p><div class="grid">{cards}</div>{coach.panel(db,c,clock,mode)}<p class="notice"><b>LET OP:</b> Paper winst is uitsluitend boekwinst uit een simulatie, niet echt verdiend gold. Vanaf v3.2 vereisen modelverkopen twee opeenvolgende marktsnapshots op of boven de doelprijs; dat bewijst nog steeds geen echte verkoop. Oude paper trades uit eerdere versies blijven in je database staan. Onverkochte voorraad staat tegen kostprijs.</p><h2>Gerichte itemzoekopdrachten</h2><p>Eigen AH-observaties, apart van publieke historie. Bij reload/logout naar desktop. Geen bewezen verkoopvolume of paper fills.</p>{table(['Tijd UTC','ItemID','Type','Laagste / stuk c','Aantal','Regels'],targetrows)}<h2 id="signals">Handelsbeslissingen</h2>{table(['Tijd','Item','Strategie','Actie','Reden','Koop c','Doel c','Aantal','ROI %'],dec)}<h2>Recente beoordeelde signalen</h2>{table(['Item','Strategie','Reden','Koop c','Doel c','ROI %','Heuristische score'],signals)}<h2>Voorraad</h2>{table(['Item','Strategie','Aantal','Kostprijs','Doel c','Status','Plaatsen','Verloopt'],[(r['name'],r['strategy'],r['qty'],old.gold(r['cost']),r['target'],r['status'],old.stamp(r['list_at']),old.stamp(r['expires'])) for r in db.execute('SELECT * FROM inventory')])}<h2>Incoming gold</h2>{table(['ItemID','Bedrag','Verwacht','Strategie'],[(r['item_id'],old.gold(r['amount']),old.stamp(r['eta']),r['strategy']) for r in db.execute('SELECT * FROM incoming')])}<h2>Resultaat per strategie</h2>{table(['Strategie','Events','Gerealiseerd copper','Modelverkopen'],strat)}<h2>Voorspelling versus resultaat (afgeronde modelorders)</h2>{table(['Strategie','Afgerond','Werkelijk c','Verwacht c','Gem. fout c','ROI %','Gem. uren'],perf)}<h2 id="patterns">Prijsprofielen (ratio t.o.v. baseline)</h2><p>Uur 0–23 lokale tijd; weekly bucket 0 = resetdag. Alleen eerdere afgeronde periodes.</p>{table(['Item','Model','Bucket','Samples','Ratio'],pat)}<h2 id="research">Populatie radar</h2><p>CSV-import, geen directe live census-API. Verandering in waargenomen characters, geen bewijs van vraag.</p>{table(['Level','Characters','Groei %','Laatste','Gekoppelde items'],pp)}<h2>Content kalender</h2>{table(['Tijd UTC','Event','Type','Bron'],ev)}<h2>Crafting radar (indicatief)</h2>{table(['Recept ID','Recept','Profession','Kosten c','Winst c','ROI %','Vol24'],[(i,n,p,cost,profit,round(roi,1),vol) for i,n,p,cost,profit,roi,vol in cr])}<h2>Backtests</h2>{table(['Type','Resultaat'],back)}<h2 id="diagnostic">Historische imports</h2>{table(['ItemID','Status','Succes UTC'],imp)}<h2>Fouten</h2>{table(['Tijd UTC','Component','Melding'],errors)}<h2>Diagnostiek</h2><p>Start EXPORT-DIAGNOSTICS.bat voor een consistente ZIP van database en logs. Een bestaande export: <a href="ForeverTrader-Diagnostics.zip">download</a> (alleen na export). Bronnen: <a href="https://auctionhouse.tk.gg/data/">TK Auction House</a> · <a href="https://classicarmory.gg/forever/census">Classic Armory Census</a>. Externe gegevens zijn niet realtime. Prijzen in copper tenzij anders vermeld.</p></html>'''
     old.atomic(folder/'dashboard.html',body)
 
 def market_wait_status(db, clock):
