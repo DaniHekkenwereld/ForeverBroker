@@ -51,7 +51,7 @@ class V4EngineTests(unittest.TestCase):
 
     def test_every_character_has_own_strategy_and_real_budget(self):
         self.add_character('Mage',1000000)
-        self.add_character('Warrior',150000)
+        self.add_character('Warrior',80000)
         plan=v4.strategy_list(self.db,self.now,self.c)
         self.assertEqual(len(plan),2)
         mage=next(x for x in plan if x['character']=='Mage')
