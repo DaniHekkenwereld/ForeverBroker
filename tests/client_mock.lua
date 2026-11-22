@@ -22,7 +22,7 @@ end
 function CreateFrame(...) local a=widget();frames[#frames+1]=a;return a end
 Auctionator={EventBus={Register=function(self,listener,events) self.listener=listener;self.event=events[1] end},IncrementalScan={Events={ScanComplete='incremental_scan_complete'}}}
 C_Container={GetContainerNumSlots=function()return 1 end,GetContainerItemInfo=function()return nil end}
-C_AuctionHouse={GetNumReplicateItems=function()return 1 end,GetReplicateItemInfo=function()return 'Linen',1,5,1,true,1,'',0,0,500,0,nil,nil,nil,nil,0,2589,true end,HasFullOwnedAuctionResults=function()return true end,GetOwnedAuctions=function()return {} end}
+C_AuctionHouse={MakeItemKey=function(id) return {itemID=id} end,IsThrottledMessageSystemReady=function()return true end,SendSearchQuery=function(key) C_AuctionHouse.lastSearched=key.itemID end,GetNumReplicateItems=function()return 1 end,GetReplicateItemInfo=function()return 'Linen',1,5,1,true,1,'',0,0,500,0,nil,nil,nil,nil,0,2589,true end,HasFullOwnedAuctionResults=function()return true end,GetOwnedAuctions=function()return {} end}
 local mail={{'seller_temp_invoice',0,100000,2000,5000,97000,0,0},{'seller',0,0,0,0,0,40000,0},{'buyer',0,0,0,0,0,0,1}}
 function GetInboxNumItems()return #mail,#mail end
 function GetInboxInvoiceInfo(i)local a=mail[i];return a[1],'Linen',nil,a[2],a[3],a[4],a[5],a[6] end
@@ -39,5 +39,9 @@ Auctionator.EventBus.listener.ReceiveEvent(nil,'incremental_scan_complete',{
  {itemKey={itemID=2592},minPrice=200,totalQuantity=50},
 })
 assert(ForeverTraderDB.browseSummary==clock..';2589:125:90;2592:200:50',ForeverTraderDB.browseSummary);
-assert(ForeverTraderDB.coach:match('|PLAN|'));fire('ITEM_PURCHASED');assert(ForeverTraderDB.coach:match('|MAIL|'));for _,v in ipairs(prints)do assert(not v:match('Fout:'),v)end
+assert(ForeverTraderDB.coach:match('|PLAN|'));
+-- Manual search must work without a desktop plan, and only send a read-only AH query.
+SlashCmdList.FOREVERTRADER('search 2589')
+assert(C_AuctionHouse.lastSearched==2589)
+fire('ITEM_PURCHASED');assert(ForeverTraderDB.coach:match('|MAIL|'));for _,v in ipairs(prints)do assert(not v:match('Fout:'),v)end
 realprint('Lua client mock: mailbox invoice, events, scan and purchase transition OK')
