@@ -19,6 +19,7 @@ import urllib.request
 import characters
 import legacy
 import trader
+import v4_dashboard
 
 SESSION=re.compile(r'^\s*\["sessionsWire"\]\s*=\s*"([^"\\]{1,49000})"\s*,?\s*$',re.M)
 FT3=re.compile(r'^FT3\|eu-2-110\|\d+\|\d+;(?:\d+:0:0:0:0(?:;|$)){1,20}$')
@@ -100,7 +101,6 @@ def make_blobs(strategies):
             kind=row.get('kind');item=row.get('id');qty=row.get('qty')
             if kind in ALLOWED_ACTION and type(item) is int and 0<item<10000000 and type(qty) is int and 0<qty<=10000:
                 decisions.append(f'{kind}:{item}:{qty}')
-        if not decisions:decisions=['WATCH:1:1'] # UI will ignore generic WATCH except as noncritical
         item=key+'?'+code
         side=key+'?'+','.join(decisions)
         if sum(map(len,plans))+len(item)>56000 or sum(map(len,actions))+len(side)>56000:
@@ -193,8 +193,9 @@ def sync_once(prepared_only=False):
         raise ValueError('Verkeerde V4 server/markt')
     plans=strategy.get('strategies')
     if not isinstance(plans,list):raise ValueError('Ongeldig serverantwoord')
+    dashboard=v4_dashboard.write(trader.ROOT/'data'/'v4'/'dashboard.html',plans,now)
     result=write_plans(path,text,plans) if not prepared_only else 'Sessies naar VPS gestuurd'
-    return f'Verstuurd: {len(chars)} characters, {len(sessions)} sessies. {result}'
+    return f'Verstuurd: {len(chars)} characters, {len(sessions)} sessies. {result} | Dashboard: {dashboard}'
 
 
 def main():
@@ -212,7 +213,9 @@ def main():
             if a.once or stamp!=previous or time.time()-last_try>=600:
                 message=sync_once()
                 print(time.strftime('%H:%M:%S'),message,flush=True)
-                previous=stamp
+                # Our own prelogin plan injection updates the file timestamp;
+                # record the NEW timestamp to prevent infinite re-sync loops.
+                previous=path.stat().st_mtime_ns if path and path.exists() else stamp
                 last_try=time.time()
         except Exception as e:
             print(time.strftime('%H:%M:%S'),'V4 bridge:',type(e).__name__,str(e)[:180],flush=True)
