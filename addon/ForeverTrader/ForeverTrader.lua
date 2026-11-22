@@ -103,7 +103,7 @@ recordCharacter=function(reason)
         rec.mailAttachments=s.attachments or 0
     end
     d.characters[key]=rec
-    local function safe(v)return tostring(v or ''):gsub('[|;"\\\r\n]','_') end
+    local function safe(v)return tostring(v or ''):gsub('[|;]','_'):gsub('%c','_'):gsub(string.char(34),'_'):gsub(string.char(92),'_') end
     local function sums(items)
         local rows={}
         if type(items)=='table' then
