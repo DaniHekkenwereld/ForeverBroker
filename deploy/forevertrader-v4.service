@@ -1,0 +1,23 @@
+[Unit]
+Description=ForeverTrader v4 market and portfolio strategy server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=forevertrader
+Group=forevertrader
+WorkingDirectory=/opt/ForeverBroker
+EnvironmentFile=/etc/forevertrader/v4.env
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/usr/bin/python3 /opt/ForeverBroker/v4_server.py
+Restart=always
+RestartSec=10
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ReadWritePaths=/opt/ForeverBroker/data
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target
