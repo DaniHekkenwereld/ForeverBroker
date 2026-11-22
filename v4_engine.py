@@ -116,7 +116,10 @@ def build_character(character, market, market_t, clock, cfg, history=None):
     rows,cov=opportunities.rank_market(market,cfg,limit=250,budget_gold=max(1,(money or 0)/10000))
     ranked=[]
     actions=[]
-    for item_id,qty in sorted(bags.items()):
+    # Prioritize inventory worth the most at today's ASK price, not low IDs.
+    owned_items=sorted(bags.items(),key=lambda pair:(
+        -((market.get(pair[0]) or {}).get('ask') or 0)*pair[1],pair[0]))
+    for item_id,qty in owned_items:
         if len(actions)>=20:break
         x=market.get(item_id) or {}
         if not _positive(x.get('ask')):
@@ -134,6 +137,20 @@ def build_character(character, market, market_t, clock, cfg, history=None):
                             reason=('Controleer exacte variant, kostprijs en actuele concurrentie'
                                     if fresh_market else 'Marktgegevens te oud om verkoopprijs te adviseren')))
     seen=set(bags)|set(listed)
+    if character.get('faction')!='Alliance':
+        # Server market key is Alliance-only. Never emit live-market plans
+        # for Horde, or mislead players with prices from the other faction.
+        actions.append(dict(kind='HOLD',id=0,name='Verkeerde faction',qty=0,
+                            reason='V4 ondersteunt alleen EU PvP Alliance'))
+        return dict(version='4.0.0',character_key=key,realm=character['realm'],
+                    character=character['character'],created_at=clock,
+                    expires_at=clock+1800,market_t=market_t,market_fresh=False,
+                    wallet_fresh=False,gold=money,last_seen=character.get('last_seen'),
+                    free_gold_after_reserve=None,reserve=None,
+                    observed_bag_types=len(bags),observed_auction_types=len(listed),
+                    coverage={},actions=actions[:40],plan='',
+                    warning='Verkeerde faction, geen AH-adviezen.',
+                    revision='unsupported')
     # Underprices can always enter the search queue, even without enough
     # sales evidence. But they must remain verify-only.
     for r in rows:
