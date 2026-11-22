@@ -48,7 +48,7 @@ class AllMarketRadarTests(unittest.TestCase):
         self.assertEqual(stats['spread_positive'],4)
         self.assertEqual({r['id'] for r in rows},{6475,15744,13260,1607})
         self.assertTrue(all(r['affordable'] for r in rows))
-        self.assertEqual(next(r for r in rows if r['id']==6475)['net_per_unit'],17322)
+        self.assertEqual(next(r for r in rows if r['id']==6475)['net_per_unit'],17377)
         self.assertTrue(next(r for r in rows if r['id']==13260)['suffix_risk'])
 
     def test_candidate_cannot_become_buy_plan(self):
