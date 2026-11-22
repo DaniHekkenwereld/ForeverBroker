@@ -6,12 +6,12 @@ Persistent
 ; F7: test Auction House audio. F8: test mailbox audio. F9: stop this script.
 CoordMode "Pixel", "Screen"
 SetTimer MonitorForeverTrader, 850
-global ftWindow := 0
-global candidate := ""
-global stableCount := 0
-global announced := ""
-global voice := 0
-global nextSpeakAt := 0
+ftWindow := 0
+candidate := ""
+stableCount := 0
+announced := ""
+voice := 0
+nextSpeakAt := 0
 try voice := ComObject("SAPI.SpVoice")
 catch {
     voice := 0
@@ -37,8 +37,11 @@ MonitorForeverTrader() {
         stableCount := 0
         return
     }
-    try WinGetClientPos(&x, &y, &w, &h, "ahk_id " ftWindow)
-    catch return
+    try {
+        WinGetClientPos(&x, &y, &w, &h, "ahk_id " ftWindow)
+    } catch {
+        return
+    }
     if w < 300 || h < 240
         return
     ; The addon draws 18x18 solid colors + a second signature square.
@@ -71,13 +74,19 @@ FindCue(x, y, w, h, primary, secondary) {
     ; neighboring 18x18 signature provides a second independent check.
     left := x, top := y, right := x+w-1, bottom := y+h-1
     loop 12 {
-        try found := PixelSearch(&px, &py, left, top, right, bottom, primary, 10)
-        catch return ""
+        try {
+            found := PixelSearch(&px, &py, left, top, right, bottom, primary, 10)
+        } catch {
+            return ""
+        }
         if !found
             return ""
         if px+28 <= right {
-            try c := PixelGetColor(px+28, py, "RGB")
-            catch c := 0
+            try {
+                c := PixelGetColor(px+28, py, "RGB")
+            } catch {
+                c := 0
+            }
             if ColorNear(c, secondary, 12)
                 return primary == 0xFF2954 ? "MAIL" : "AH"
         }
