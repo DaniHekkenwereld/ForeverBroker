@@ -1,4 +1,4 @@
--- ForeverTrader v3.2.0 - read-only companion. No protected actions or movement.
+-- ForeverTrader v3.3.1 - automatic read-only AH searches + AHK speech status bridge.
 local L=ForeverTraderLogic
 local T=ForeverTraderTarget
 local frame=CreateFrame('Frame')
@@ -7,7 +7,7 @@ local function now() return GetServerTime and GetServerTime() or time() end
 local function db() if type(ForeverTraderDB)~='table' then ForeverTraderDB={} end; ForeverTraderDB.schema='FT1';return ForeverTraderDB end
 local function market() return UnitFactionGroup('player') or 'Unknown',tostring(GetCurrentRegion and GetCurrentRegion() or 0) end
 local function realmOK() local a,b=market();return a=='Alliance' and b=='3' and db().pvpConfirmed==true and (not GetRealmName or db().confirmedRealm==GetRealmName()) end
-local s={active=false,mailOpen=false,ahOpen=false,mailKnown=false,ready=0,pending=0,attachments=0,partial=false,cash=0,reserve=150000,threshold=20000,buyCount=0,sellCount=0,mailAlert=false,bought=false,live=false,liveSpent=0,walletKnown=false}
+local s={active=false,mailOpen=false,ahOpen=false,mailKnown=false,ready=0,pending=0,attachments=0,partial=false,cash=0,reserve=150000,threshold=20000,buyCount=0,sellCount=0,mailAlert=false,bought=false,live=false,liveSpent=0,walletKnown=false,autoSearch=false,autoSearchCount=0}
 local plan,book,bags,buys,sells=nil,{},{},{},{}
 local listed={}
 local targetBook,lastTry={},{}
@@ -83,6 +83,17 @@ ui:SetBackdrop({bgFile='Interface/Tooltips/UI-Tooltip-Background',edgeFile='Inte
 local title=ui:CreateFontString(nil,'OVERLAY','GameFontNormalLarge');title:SetPoint('TOPLEFT',14,-12);title:SetText('ForeverTrader 3.3.0')
 local text=ui:CreateFontString(nil,'OVERLAY','GameFontHighlight');text:SetPoint('TOPLEFT',14,-39);text:SetWidth(402);text:SetJustifyH('LEFT');text:SetJustifyV('TOP')
 local close=CreateFrame('Button',nil,ui,'UIPanelCloseButton');close:SetPoint('TOPRIGHT',0,0)
+-- Compact high-contrast communication marker read by local AHK via PixelSearch.
+local voiceMarker=ui:CreateTexture(nil,'OVERLAY')
+voiceMarker:SetSize(22,22);voiceMarker:SetPoint('TOPRIGHT',-34,-10)
+local function bridgeStatus(code)
+    local state=(code=='MAIL' or code=='MAIL_CHECK' or code=='COLLECT' or code=='MAIL_WAIT') and 'MAIL'
+                or (code=='AH' or code=='RETURN') and 'AH' or 'IDLE'
+    if state=='MAIL' then voiceMarker:SetColorTexture(1,.16,.33,1)
+    elseif state=='AH' then voiceMarker:SetColorTexture(.07,.85,.55,1)
+    else voiceMarker:SetColorTexture(.10,.14,.19,1) end
+    s.voiceState=state
+end
 local lastCode,lastNotify=nil,0
 local function name(id) return (GetItemInfo and GetItemInfo(id)) or (C_Item and C_Item.GetItemNameByID and C_Item.GetItemNameByID(id)) or ('Item '..id) end
 update=function()
@@ -99,7 +110,8 @@ update=function()
         buys=safe
     end
     s.buyCount=#buys;s.sellCount=#sells
-    local code,msg=L.next(s,now());local lines={msg,'Gold '..gold(s.cash)..' | Incoming (laatst gezien) '..gold(s.pending)..' | Klaar (laatst gezien) '..gold(s.ready)}
+    local code,msg=L.next(s,now());bridgeStatus(code);local lines={msg,'Gold '..gold(s.cash)..' | Incoming (laatst gezien) '..gold(s.pending)..' | Klaar (laatst gezien) '..gold(s.ready)}
+    if s.autoSearch then lines[#lines+1]='AUTO ZOEKEN: aan ('..(s.autoSearchCount or 0)..' opdrachten)' end
     if s.live then
         lines[#lines+1]='LIVE TEST: alleen adviezen, transacties zelf klikken!'
         lines[#lines+1]='Budget gebruikt '..gold(s.liveSpent)..'/5.00g | max 1g per advies | reserve 15g'
@@ -216,7 +228,7 @@ if hooksecurefunc and C_AuctionHouse and C_AuctionHouse.SendBrowseQuery then
         if C_AuctionHouse[fn] then pcall(hooksecurefunc,C_AuctionHouse,fn,function() browseFull=false end) end
     end
 end
-local function searchNext(id)
+local function searchNext(id,quiet)
     if not s.ahOpen and AuctionHouseFrame and AuctionHouseFrame.IsShown and AuctionHouseFrame:IsShown() then s.ahOpen=true end
     if not s.active or not s.ahOpen or not realmOK() then say('Open het AH en start de coach.');return end
     if now()-lastQuery<5 then say('Wacht op AH-resultaten.');return end
@@ -239,20 +251,35 @@ local function searchNext(id)
         if not plan or now()>=plan.expires then say('Laad eerst een actuele planning of gebruik /ft search <itemID> voor een losse prijscontrole.');return end
         r=T.choose(plan,targetBook,bags,listed,now(),lastTry)
     end
-    if not r then say('Geen nieuw item te controleren.');return end
+    if not r then if not quiet then say('Geen nieuw item te controleren.') end;return end
     local key=a.MakeItemKey(r.id);if not key then return end
     pending={id=r.id,at=now()};lastQuery=now();lastTry[r.id]=now();targetBook[r.id]=nil
     local ok,err=pcall(a.SendSearchQuery,key,{{sortOrder=0,reverseSort=false}},true)
     if not ok then pending=nil;say('Zoeken mislukt: '..tostring(err))
-    else say('AH-zoekopdracht verstuurd: '..name(r.id)..'. Wacht op resultaat.') end
+    else
+        if quiet then
+            s.autoSearchCount=(s.autoSearchCount or 0)+1
+            db().lastAutoSearch=now()..'|'..r.id..'|'..s.autoSearchCount
+            if s.autoSearchCount==1 or s.autoSearchCount%15==0 then say('Automatisch '..s.autoSearchCount..' AH-items gecontroleerd (laatste: '..name(r.id)..').') end
+        else say('AH-zoekopdracht verstuurd: '..name(r.id)..'. Wacht op resultaat.') end
+    end
     update()
+end
+-- Read-only queries only. Pause on actionable results, throttle and mailbox hints.
+local function maybeAutoSearch()
+    if not s.autoSearch or not s.active or not s.ahOpen or not realmOK() then return end
+    if not plan or now()>=plan.expires or pending or s.bought or s.buyBlocked or s.mailAlert then return end
+    if s.buyCount>0 or s.sellCount>0 or not s.searchCandidate then return end
+    if now()-lastQuery<5 then return end
+    if not C_AuctionHouse or not C_AuctionHouse.IsThrottledMessageSystemReady or not C_AuctionHouse.IsThrottledMessageSystemReady() then return end
+    searchNext(nil,true)
 end
 local function mailSignal() if HasNewMail then local has=HasNewMail() and true or false;if has and not s.lastMailSignal and not s.mailOpen then s.mailAlert=true end;s.lastMailSignal=has end end
 for _,event in ipairs({'PLAYER_LOGIN','PLAYER_LOGOUT','PLAYER_MONEY','MAIL_SHOW','MAIL_CLOSED','MAIL_INBOX_UPDATE','UPDATE_PENDING_MAIL','REPLICATE_ITEM_LIST_UPDATE','AUCTION_HOUSE_SHOW','AUCTION_HOUSE_CLOSED','PLAYER_INTERACTION_MANAGER_FRAME_SHOW','PLAYER_INTERACTION_MANAGER_FRAME_HIDE','BAG_UPDATE_DELAYED','OWNED_AUCTIONS_UPDATED','ITEM_PURCHASED','COMMODITY_PURCHASE_SUCCEEDED','AUCTION_HOUSE_AUCTIONS_EXPIRED','AUCTION_HOUSE_AUCTION_CREATED','ITEM_SEARCH_RESULTS_UPDATED','ITEM_SEARCH_RESULTS_ADDED','COMMODITY_SEARCH_RESULTS_UPDATED','COMMODITY_SEARCH_RESULTS_ADDED','AUCTION_HOUSE_BROWSE_RESULTS_UPDATED','AUCTION_HOUSE_BROWSE_RESULTS_ADDED'}) do pcall(frame.RegisterEvent,frame,event) end
 frame:SetScript('OnEvent',function(_,e,...)
     local key=...
     check(function()
-        if e=='PLAYER_LOGIN' then ensureAuctionatorListener();s.loggingOut=false;s.live=false;s.liveSpent=0;s.walletKnown=false;s.active=false;plan=L.plan(db().planText,now());getBags();mailSignal();ui:Hide()
+        if e=='PLAYER_LOGIN' then ensureAuctionatorListener();s.loggingOut=false;s.autoSearch=false;s.autoSearchCount=0;s.live=false;s.liveSpent=0;s.walletKnown=false;s.active=false;plan=L.plan(db().planText,now());getBags();mailSignal();ui:Hide()
         elseif e=='PLAYER_LOGOUT' then s.loggingOut=true
         elseif e=='MAIL_SHOW' then s.mailOpen=true;s.mailKnown=false;s.ahOpen=false;if C_Timer and C_Timer.After then C_Timer.After(1,function() if s.mailOpen then check(function() mailbox();update() end) end end) end
         elseif e=='MAIL_INBOX_UPDATE' then mailbox()
@@ -272,7 +299,13 @@ frame:SetScript('OnEvent',function(_,e,...)
         end;update()
     end)
 end)
-local elapsed=0; frame:SetScript('OnUpdate',function(_,dt) elapsed=elapsed+dt;if elapsed>=5 then elapsed=0;if s.active then check(function() mailSignal();update() end) end end end)
+local elapsed=0; frame:SetScript('OnUpdate',function(_,dt)
+    elapsed=elapsed+dt
+    if elapsed>=5 then
+        elapsed=0
+        if s.active then check(function() mailSignal();update();maybeAutoSearch() end) end
+    end
+end)
 local input=CreateFrame('EditBox','ForeverTraderPlanInput',ui,'InputBoxTemplate');input:SetSize(390,22);input:SetPoint('BOTTOM',0,36);input:SetAutoFocus(false);input:SetMaxLetters(12000);input:Hide()
 input:SetScript('OnEnterPressed',function(self) local p,err=L.plan(self:GetText(),now());if not p then say(err);return end;plan=p;db().planText=self:GetText();self:SetText('');self:ClearFocus();self:Hide();say('Planning geladen: '..#p.rows..' items (inclusief alleen-controleren).');update() end)
 input:SetScript('OnEscapePressed',function(self) self:ClearFocus();self:Hide() end)
@@ -283,6 +316,11 @@ button('Zoek volgend',288,function() check(searchNext) end)
 SLASH_FOREVERTRADER1='/ft';SlashCmdList.FOREVERTRADER=function(msg)
     msg=msg:lower():match('^%s*(.-)%s*$');check(function()
         if msg=='start' then s.active=true;ui:Show();mailSignal();getBags();lastCode=nil
+        elseif msg=='auto on' then
+            s.autoSearch=true;s.active=true;s.autoSearchCount=0
+            ui:Show();say('Automatisch AH-zoeken AAN; server-throttle en actieve koopadviezen pauzeren de wachtrij.')
+        elseif msg=='auto off' then s.autoSearch=false;say('Automatisch AH-zoeken UIT.')
+        elseif msg=='auto' then say('Automatisch AH-zoeken '..(s.autoSearch and 'AAN' or 'UIT')..'. /ft auto on of /ft auto off.')
         elseif msg=='live on' then
             if not s.ahOpen and AuctionHouseFrame and AuctionHouseFrame.IsShown and AuctionHouseFrame:IsShown() then s.ahOpen=true end
             if not realmOK() or not s.ahOpen or not s.walletKnown then say('Live test alleen met AH open, bevestigde EU Alliance en geladen wallet.');return end
@@ -290,14 +328,14 @@ SLASH_FOREVERTRADER1='/ft';SlashCmdList.FOREVERTRADER=function(msg)
             say('Live test AAN: adviezen met 5g sessiebudget en max 1g per item. Kopen/verkopen blijft handmatig.')
         elseif msg=='live off' then s.live=false;s.liveSpent=0;s.buyBlocked=true;say('Live test UIT. Geen aankopen zonder eigen bevestiging.')
         elseif msg=='live' then say('Live test '..(s.live and 'AAN' or 'UIT')..'. Gebruik /ft live on of /ft live off. Geen automatische orders.')
-        elseif msg=='stop' then s.active=false;s.live=false;ui:Hide()
+        elseif msg=='stop' then s.active=false;s.live=false;s.autoSearch=false;ui:Hide()
         elseif msg=='market' then local f,r=market();if f~='Alliance' or r~='3' then say('Geen EU Alliance.');return end;db().pvpConfirmed=true;db().confirmedRealm=GetRealmName and GetRealmName() or nil;s.market=true;say('PvP door jou bevestigd; controleer dat dit de juiste realm is.')
         elseif msg=='plan' then ui:Show();input:Show();input:SetFocus();say('Plak de FT3-planning uit het dashboard en druk Enter.')
         elseif msg=='bought' or msg=='mail' then s.bought=true;s.buyBlocked=true;targetBook={};lastCode=nil
         elseif msg=='search' then searchNext()
         elseif msg:match('^search %d+$') then searchNext(tonumber(msg:match('%d+')))
         elseif msg=='status' or msg=='' then ui:Show();lastCode=nil
-        else say('/ft start | stop | live on/off | market | plan | bought | mail | search [itemID] | status');return end
+        else say('/ft start | stop | auto on/off | live on/off | market | plan | bought | mail | search [itemID] | status');return end
         update()
     end)
 end
