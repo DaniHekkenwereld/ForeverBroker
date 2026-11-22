@@ -7,6 +7,7 @@ function GetMoney() return currentMoney end
 function UnitFactionGroup() return 'Alliance' end
 function GetCurrentRegion() return 3 end
 function GetRealmName() return 'Forever' end
+function UnitName() return 'Mage' end
 function HasNewMail() return false end
 function GetItemInfo(i) return 'Item '..tostring(i) end
 UIParent={}; SlashCmdList={}
@@ -61,6 +62,9 @@ dofile('addon/ForeverTrader/Logic.lua')
 dofile('addon/ForeverTrader/Target.lua')
 dofile('addon/ForeverTrader/ForeverTrader.lua')
 fire('PLAYER_LOGIN')
+assert(type(ForeverTraderDB.characters)=='table','account-wide snapshot must exist')
+assert(ForeverTraderDB.characters['Forever#Mage'].gold==500000,'gold captured on login')
+assert(ForeverTraderDB.charactersWire:find('Forever|Mage|Alliance|500000',1,true),'bounded export should include mage')
 SlashCmdList.FOREVERTRADER('market')
 SlashCmdList.FOREVERTRADER('start')
 fire('MAIL_SHOW');fire('MAIL_INBOX_UPDATE')
