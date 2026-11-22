@@ -39,6 +39,7 @@ De server deelt geen fake GPH, paper-trades of fictieve verkopen uit als werkeli
 **Vereist:** Linux VPS met Python 3.10+, HTTPS-domein, DNS-record, Caddy of nginx, Python-projectcode. De VPS hoeft WoW niet te draaien.
 
 - Kopieer de repository naar `/opt/ForeverBroker` en maak gebruiker `forevertrader`, inclusief schrijfrechten op `/opt/ForeverBroker/data`.
+- **Belangrijk voor je bestaande markthistorie:** zet, met de oude desktopengine uit, een consistente backup van je huidige `data/paper/trader.sqlite` op dezelfde locatie op de VPS voordat je v4 start. Gebruik bij voorkeur de `trader.sqlite` uit een diagnostische ZIP of een SQLite-backup, niet een live WAL-database die nog wordt bijgewerkt. Zonder deze stap begint de server met nieuwe prijshistorie en zijn historische signals voorlopig beperkt.
 - Maak met een veilige random generator een unieke sleutel van minimaal 32 tekens. **Zet hem nooit in de repository**.
 - Maak `/etc/forevertrader/v4.env` (rechten 0600), bijvoorbeeld:
 
