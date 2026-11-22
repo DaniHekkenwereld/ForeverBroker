@@ -28,6 +28,8 @@ De paper-simulatie reserveert **20% cash**. Daghandel mag maximaal **75% totale 
 
 `direct`, `intraday` en `weekly` blijven beschikbaar. Nieuwe signalen worden op **geschatte absolute netto winst in copper** gesorteerd, niet uitsluitend op ROI. Grote voorstellen worden teruggeschaald naar budget in plaats van helemaal afgewezen.
 
+Nieuwe historische itemimports worden na de vaste watchlist ook op **prijsverschil na AH-cut × realistisch beschikbaar volume** gerangschikt, zodat een item met een grote maar verhandelbare dagspread voorrang krijgt op producten met alleen enorm veel volume. De API blijft beperkt tot de bestaande voorzichtige importcadans.
+
 ### Op dashboard
 
 De tabel **Dagplanning** toont per product:
@@ -35,6 +37,7 @@ De tabel **Dagplanning** toont per product:
 - Maximaal berekende koopprijs en conservatieve verkoopdoelprijs per stuk.
 - Aantal volledige dagen, winrate en conservatieve marge na AH-cut.
 - Of er nu een koopvenster is, of het tijdstip al voorbij is, en of er genoeg herhaalbaar bewijs is.
+- Indicatieve **nettogoldwinst als alle modelmatig beschikbare units daadwerkelijk zouden verkopen**. Dit is geen gerealiseerde winst en gaat uit van de vertraagde publieke prijs.
 
 Is de historische winrate onvoldoende? Dan staat er **Onvoldoende herhaalbaar** en wordt er geen `daily`-kooporder verzonnen. Kijk ook naar hoeveel items überhaupt geldige uurdata hebben.
 
