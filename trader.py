@@ -8,6 +8,7 @@ import targeted
 import daily
 import opportunities
 import characters
+import sync_client
 ROOT=pathlib.Path(__file__).resolve().parent
 VERSION='3.4.0'; MARKET=old.MARKET; BASE='https://auctionhouse.tk.gg/api'
 UTC=dt.timezone.utc
@@ -651,7 +652,8 @@ def main():
                 import_history(db,c,m,clock); recipe_update(db,clock)
             with db:
                 lm='Demo, geen echte WoW-data' if args.demo else capture_local(db,c,clock)
-                dashboard(db,folder,c,clock,status,lm,m,mode)
+                sync_status='Demo: synchronisatie uit' if args.demo else sync_client.sync(db,clock,log)
+                dashboard(db,folder,c,clock,status,lm+' | '+sync_status,m,mode)
             print(old.stamp(clock),status,flush=True)
             if not opened and not args.no_browser:webbrowser.open((folder/'dashboard.html').as_uri());opened=True
             if args.once:break
