@@ -83,7 +83,7 @@ FindCue(x, y, w, h, primary, secondary) {
             return ""
         if px+28 <= right {
             try {
-                c := PixelGetColor(px+28, py, "RGB")
+                c := PixelGetColor(px+28, py)
             } catch {
                 c := 0
             }
