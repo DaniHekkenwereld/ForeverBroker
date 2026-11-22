@@ -1,0 +1,10 @@
+# Addon installatie 3.1
+
+Verplicht: [Auctionator](https://www.curseforge.com/wow/addons/auctionator) (Forever-versie) en meegeleverde ForeverTrader.
+Optioneel: [Postage](https://github.com/DrKlampz/Postage/releases) voor mailbox, [Journalator](https://www.curseforge.com/wow/addons/journalator) voor eigen historisch log, [AHledger](https://ahledger.com/addon) als extra prijsreferentie. Deze optionele addons worden niet door v3 uitgelezen. Gebruik niet meerdere full-scanners tegelijk. Zet hun autoscan eventueel uit.
+
+Sluit WoW en draai INSTALL-ADDON.bat. Controleer dat `World of Warcraft/_forever_/Interface/AddOns/ForeverTrader/ForeverTrader.toc` bestaat met `Logic.lua`, `Target.lua` en `ForeverTrader.lua`. Verwijder een oude addonmap alleen na backup van je eigen SavedVariables. Interface 16001 is het gedocumenteerde interfacegetal.
+
+Na login `/ft market`, `/ft start`. Doorloop LEES-MIJ-EERST.md. Bij een Lua-fout: `/console scriptErrors 1`, maak een screenshot en geef de actie door; zet eventueel de addon uit. Voor echte clientvalidatie: doe een Auctionator full scan, controleer een bekende stackprijs (totaal vs per stuk), open mailbox met pending sale en een echte aankoop, vergelijk bedragen met de standaard UI, `/reload`, stuur diagnostiek. Geen externe inputmodule, geen pixelclicker.
+
+Gebruik **Zoek volgend** in de coach voor het volgende item uit je planning. Zelf zoeken werkt ook, mits de client volledige item- of commodity-resultaten aflevert. Als het resultaat onvolledig blijft: laat Auctionator de normale zoekopdracht afronden; geen koopadvies tot die tijd. Na reload stuurt de addon zijn opgeslagen gerichte observaties naar de desktop.

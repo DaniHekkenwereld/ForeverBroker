@@ -1,0 +1,38 @@
+test_book (test_targeted.TargetTests.test_book) ... ok
+test_commodity (test_targeted.TargetTests.test_commodity) ... ok
+test_empty_supersedes (test_targeted.TargetTests.test_empty_supersedes) ... ok
+test_new_opportunity (test_targeted.TargetTests.test_new_opportunity) ... ok
+test_plan_updates (test_targeted.TargetTests.test_plan_updates) ... ok
+test_reject_invalid (test_targeted.TargetTests.test_reject_invalid) ... ok
+test_ahl (test_trader.TraderTests.test_ahl) ... ok
+test_bad_config (test_trader.TraderTests.test_bad_config) ... ok
+test_crafting (test_trader.TraderTests.test_crafting) ... ok
+test_cycle_and_duplicates (test_trader.TraderTests.test_cycle_and_duplicates) ... ok
+test_dashboard (test_trader.TraderTests.test_dashboard) ... ok
+test_expiry (test_trader.TraderTests.test_expiry) ... ok
+test_incoming_and_settlement (test_trader.TraderTests.test_incoming_and_settlement) ... ok
+test_local_parser (test_trader.TraderTests.test_local_parser) ... ok
+test_market_named_fields (test_trader.TraderTests.test_market_named_fields) ... ok
+test_backtest_separate (test_v2.V2Tests.test_backtest_separate) ... ok
+test_cycle_ledger_mail_and_expiry (test_v2.V2Tests.test_cycle_ledger_mail_and_expiry) ... ok
+test_export (test_v2.V2Tests.test_export) ... ok
+test_held_deposit_and_expiry (test_v2.V2Tests.test_held_deposit_and_expiry) ... ok
+test_import (test_v2.V2Tests.test_import) ... ok
+test_market_history_and_duplicate (test_v2.V2Tests.test_market_history_and_duplicate) ... ok
+test_population_validation (test_v2.V2Tests.test_population_validation) ... ok
+test_profiles_no_future (test_v2.V2Tests.test_profiles_no_future) ... ok
+test_reset_local (test_v2.V2Tests.test_reset_local) ... ok
+test_stale_data_is_no_order (test_v2.V2Tests.test_stale_data_is_no_order) ... ok
+test_cap (test_v3.CoachTests.test_cap) ... ok
+test_local_extras (test_v3.CoachTests.test_local_extras) ... ok
+test_plan (test_v3.CoachTests.test_plan) ... ok
+test_plan_filters (test_v3.CoachTests.test_plan_filters) ... ok
+test_timing_not_direct_gate (test_v3.CoachTests.test_timing_not_direct_gate) ... ok
+
+----------------------------------------------------------------------
+Ran 30 tests in 0.825s
+
+OK
+Lua coach: 23 checks OK
+Lua client mock: mailbox invoice, events, scan and purchase transition OK
+Lua targeted: stack totals, unit prices, own auction exclusion, empty, partial, expiry, selection PASS
