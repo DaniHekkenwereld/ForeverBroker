@@ -43,5 +43,14 @@ assert(ForeverTraderDB.coach:match('|PLAN|'));
 -- Manual search must work without a desktop plan, and only send a read-only AH query.
 SlashCmdList.FOREVERTRADER('search 2589')
 assert(C_AuctionHouse.lastSearched==2589)
-fire('ITEM_PURCHASED');assert(ForeverTraderDB.coach:match('|MAIL|'));for _,v in ipairs(prints)do assert(not v:match('Fout:'),v)end
+fire('ITEM_PURCHASED');assert(ForeverTraderDB.coach:match('|MAIL|'));
+SlashCmdList.FOREVERTRADER('live on')
+assert(ForeverTraderDB.wallet:match('|Alliance|3do assert(not v:match('Fout:'),v)end
+realprint('Lua client mock: mailbox invoice, events, scan and purchase transition OK')
+))
+local beforeLogoutWallet=ForeverTraderDB.wallet
+function GetMoney() return 0 end
+fire('PLAYER_LOGOUT')
+assert(ForeverTraderDB.wallet==beforeLogoutWallet,'logout must not overwrite valid gold with 0g')
+for _,v in ipairs(prints)do assert(not v:match('Fout:'),v)end
 realprint('Lua client mock: mailbox invoice, events, scan and purchase transition OK')
