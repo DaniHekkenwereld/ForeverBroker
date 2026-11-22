@@ -19,4 +19,12 @@ assert(#L.matches(p,b,{},150000,150000,t,t,{})==0)
 assert(#L.matches(p,b,{},500000,150000,t+900,t,{})==0)
 assert(#L.matches(p,b,{},500000,150000,t,t,{[2589]=5})==0)
 b[2589].floor=160;buy,sell=L.matches(p,b,{[2589]=10,[10620]=20},500000,150000,t,t,{});assert(#buy==0 and #sell==1 and sell[1].id==2589)
-print('Lua coach: 23 checks OK')
+local live={live=true,market=true,ahOpen=true,walletKnown=true,liveSpent=0,cash=400000}
+assert(L.liveAllowed(live,{cost=10000},{at=t},t))
+assert(not L.liveAllowed(live,{cost=10001},{at=t},t))
+assert(not L.liveAllowed(live,{cost=10000},{at=t-60},t))
+live.liveSpent=49001
+assert(not L.liveAllowed(live,{cost=10000},{at=t},t))
+live.liveSpent=0;live.cash=150001
+assert(not L.liveAllowed(live,{cost=10000},{at=t},t))
+print('Lua coach: live test budget/price checks OK')
