@@ -19,6 +19,16 @@ Daarna gebruik je bij iedere nieuwe versie alleen:
 
 Sluit eerst WoW en `START.bat`. De updater bewaart `config.json` en `data/` en vernieuwt, wanneer `wow_folder` is ingesteld, ook de WoW-addon. In een Git-clone gebruikt de updater `git pull --ff-only` (lokale wijzigingen kunnen dat blokkeren).
 
+## Nieuw in 3.5: snapshots van al je characters + VPS-synchronisatie
+
+- De WoW-addon registreert automatisch je characternaam, realm, faction, gold, tassen en (indien geopend) eigen AH-veilingen en mailbox. Gegevens van meerdere characters blijven afzonderlijk bewaard in accountbrede SavedVariables.
+- De Windows-app leest dit na een SavedVariables-write automatisch in en toont een **Jouw characters**-overzicht met tijdstip per meting.
+- Optionele `sync_client.py` uploadt per-character gegevens via HTTPS met een eigen geheime token naar `sync_server.py` op je VPS. Standaard **uitgeschakeld** totdat jij `FT_SYNC_URL` en `FT_SYNC_TOKEN` instelt. Secrets niet in Git zetten.
+- **Nog niet live op het moment van inloggen:** WoW schrijft SavedVariables pas bij **/reload of uitloggen**. Om zonder /reload direct bij login naar de VPS te synchroniseren moet de realtime desktop/game-bridge nog worden ontwikkeld en getest.
+- De bestaande handelsengine blijft voorlopig een gescheiden paperstrategie. Een echte portfolio-manager die inkoopkosten per char vergelijkt met huidige prijzen ontbreekt nog.
+
+[Handleiding character sync, VPS-installatie en beperkingen](docs/CHARACTER-SYNC-3.5.md).
+
 ## Nieuw in 3.4: bekijk alle items, niet alleen materialen
 
 - De nieuwe **brede kansenradar** beoordeelt alle items uit de publieke marktfeed, óók BoE-armor, wapens, recipes, containers, pets en ongebruikelijke items.
