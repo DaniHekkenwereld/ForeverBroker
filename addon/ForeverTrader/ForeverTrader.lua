@@ -107,7 +107,7 @@ local function check(fn) local ok,err=pcall(fn);if not ok then say('Fout: '..tos
 -- whether an arbitrary BrowseQuery was truly a full-market scan.
 local auctionatorListener
 local function readAuctionatorSummary(rawScan)
-    if type(rawScan)~='table' or not s.ahOpen or not realmOK() then return end
+    if type(rawScan)~='table' or not realmOK() then return end
     local rows,count={},0
     -- This summary reports a minimum UNIT price and aggregate quantity; it is
     -- not a set of executable per-listing buyouts. Never feed it to L.matches.
@@ -199,6 +199,7 @@ if hooksecurefunc and C_AuctionHouse and C_AuctionHouse.SendBrowseQuery then
     end
 end
 local function searchNext(id)
+    if not s.ahOpen and AuctionHouseFrame and AuctionHouseFrame.IsShown and AuctionHouseFrame:IsShown() then s.ahOpen=true end
     if not s.active or not s.ahOpen or not realmOK() then say('Open het AH en start de coach.');return end
     if now()-lastQuery<5 then say('Wacht op AH-resultaten.');return end
     local a=C_AuctionHouse
@@ -229,7 +230,7 @@ local function searchNext(id)
     update()
 end
 local function mailSignal() if HasNewMail then local has=HasNewMail() and true or false;if has and not s.lastMailSignal and not s.mailOpen then s.mailAlert=true end;s.lastMailSignal=has end end
-for _,event in ipairs({'PLAYER_LOGIN','PLAYER_LOGOUT','PLAYER_MONEY','MAIL_SHOW','MAIL_CLOSED','MAIL_INBOX_UPDATE','UPDATE_PENDING_MAIL','REPLICATE_ITEM_LIST_UPDATE','AUCTION_HOUSE_SHOW','AUCTION_HOUSE_CLOSED','BAG_UPDATE_DELAYED','OWNED_AUCTIONS_UPDATED','ITEM_PURCHASED','COMMODITY_PURCHASE_SUCCEEDED','AUCTION_HOUSE_AUCTIONS_EXPIRED','AUCTION_HOUSE_AUCTION_CREATED','ITEM_SEARCH_RESULTS_UPDATED','ITEM_SEARCH_RESULTS_ADDED','COMMODITY_SEARCH_RESULTS_UPDATED','COMMODITY_SEARCH_RESULTS_ADDED','AUCTION_HOUSE_BROWSE_RESULTS_UPDATED','AUCTION_HOUSE_BROWSE_RESULTS_ADDED'}) do pcall(frame.RegisterEvent,frame,event) end
+for _,event in ipairs({'PLAYER_LOGIN','PLAYER_LOGOUT','PLAYER_MONEY','MAIL_SHOW','MAIL_CLOSED','MAIL_INBOX_UPDATE','UPDATE_PENDING_MAIL','REPLICATE_ITEM_LIST_UPDATE','AUCTION_HOUSE_SHOW','AUCTION_HOUSE_CLOSED','PLAYER_INTERACTION_MANAGER_FRAME_SHOW','PLAYER_INTERACTION_MANAGER_FRAME_HIDE','BAG_UPDATE_DELAYED','OWNED_AUCTIONS_UPDATED','ITEM_PURCHASED','COMMODITY_PURCHASE_SUCCEEDED','AUCTION_HOUSE_AUCTIONS_EXPIRED','AUCTION_HOUSE_AUCTION_CREATED','ITEM_SEARCH_RESULTS_UPDATED','ITEM_SEARCH_RESULTS_ADDED','COMMODITY_SEARCH_RESULTS_UPDATED','COMMODITY_SEARCH_RESULTS_ADDED','AUCTION_HOUSE_BROWSE_RESULTS_UPDATED','AUCTION_HOUSE_BROWSE_RESULTS_ADDED'}) do pcall(frame.RegisterEvent,frame,event) end
 frame:SetScript('OnEvent',function(_,e,...)
     local key=...
     check(function()
@@ -239,6 +240,8 @@ frame:SetScript('OnEvent',function(_,e,...)
         elseif e=='MAIL_CLOSED' then s.mailOpen=false
         elseif e=='UPDATE_PENDING_MAIL' then mailSignal();if not s.mailOpen and HasNewMail and HasNewMail() and now()-(s.lastMail or 0)>60 then s.mailAlert=true end
         elseif e=='AUCTION_HOUSE_SHOW' then s.ahOpen=true;s.mailOpen=false;owned()
+        elseif e=='PLAYER_INTERACTION_MANAGER_FRAME_SHOW' and Enum and Enum.PlayerInteractionType and key==Enum.PlayerInteractionType.Auctioneer then s.ahOpen=true;s.mailOpen=false;owned()
+        elseif e=='PLAYER_INTERACTION_MANAGER_FRAME_HIDE' and Enum and Enum.PlayerInteractionType and key==Enum.PlayerInteractionType.Auctioneer then s.ahOpen=false;pending=nil;targetBook={};browseFull=false
         elseif e=='AUCTION_HOUSE_CLOSED' then s.ahOpen=false;pending=nil;targetBook={};browseFull=false
         elseif e=='REPLICATE_ITEM_LIST_UPDATE' then scan()
         elseif e=='AUCTION_HOUSE_BROWSE_RESULTS_UPDATED' or e=='AUCTION_HOUSE_BROWSE_RESULTS_ADDED' then browseSummary()
