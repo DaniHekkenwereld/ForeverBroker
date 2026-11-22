@@ -1,56 +1,115 @@
--- Minimal read-only WoW API mocks. This validates the addon event wiring, not the real client.
-local clock=1800000000;local events={};local frames={};local prints={}
+-- Minimal Lua integration mock for addon states and read-only AH auto searching.
+local clock=1800000000
+local events,frames,prints,textures={},{},{},{}
 function GetServerTime() return clock end
-function GetMoney() return 500000 end
+local currentMoney=500000
+function GetMoney() return currentMoney end
 function UnitFactionGroup() return 'Alliance' end
 function GetCurrentRegion() return 3 end
+function GetRealmName() return 'Forever' end
 function HasNewMail() return false end
-function GetItemInfo(i) return 'Linen' end
-UIParent={};SlashCmdList={};SOUNDKIT={RAID_WARNING=1};function PlaySound() end
+function GetItemInfo(i) return 'Item '..tostring(i) end
+UIParent={}; SlashCmdList={}
+SOUNDKIT={RAID_WARNING=1};function PlaySound() end
 local function noop() end
 local function widget()
- local self={scripts={}}
- return setmetatable(self,{__index=function(t,k)
-  if k=='SetScript' then return function(_,event,fn)t.scripts[event]=fn end end
-  if k=='RegisterEvent' then return function(_,e)events[e]=t end end
-  if k=='CreateFontString' then return function()return widget() end end
-  if k=='SetText' then return function(_,v)t.value=v end end
-  if k=='GetText' then return function()return t.value end end
-  return noop
- end})
+    local self={scripts={}}
+    return setmetatable(self,{__index=function(t,k)
+        if k=='SetScript' then return function(_,event,fn)t.scripts[event]=fn end end
+        if k=='RegisterEvent' then return function(_,event)events[event]=t end end
+        if k=='CreateFontString' then return function()return widget() end end
+        if k=='CreateTexture' then return function()local a=widget();textures[#textures+1]=a;return a end end
+        if k=='SetColorTexture' then return function(_,r,g,b,a)t.color={r,g,b,a} end end
+        if k=='SetText' then return function(_,v)t.value=v end end
+        if k=='GetText' then return function()return t.value end end
+        return noop
+    end})
 end
-function CreateFrame(...) local a=widget();frames[#frames+1]=a;return a end
-Auctionator={EventBus={Register=function(self,listener,events) self.listener=listener;self.event=events[1] end},IncrementalScan={Events={ScanComplete='incremental_scan_complete'}}}
-C_Container={GetContainerNumSlots=function()return 1 end,GetContainerItemInfo=function()return nil end}
-C_AuctionHouse={MakeItemKey=function(id) return {itemID=id} end,IsThrottledMessageSystemReady=function()return true end,SendSearchQuery=function(key) C_AuctionHouse.lastSearched=key.itemID end,GetNumReplicateItems=function()return 1 end,GetReplicateItemInfo=function()return 'Linen',1,5,1,true,1,'',0,0,500,0,nil,nil,nil,nil,0,2589,true end,HasFullOwnedAuctionResults=function()return true end,GetOwnedAuctions=function()return {} end}
-local mail={{'seller_temp_invoice',0,100000,2000,5000,97000,0,0},{'seller',0,0,0,0,0,40000,0},{'buyer',0,0,0,0,0,0,1}}
+function CreateFrame(...) local frame=widget();frames[#frames+1]=frame;return frame end
+Auctionator={
+    EventBus={Register=function(self,listener,registered)self.listener=listener;self.event=registered[1] end},
+    IncrementalScan={Events={ScanComplete='incremental_scan_complete'}}
+}
+C_Container={GetContainerNumSlots=function()return 1 end,
+             GetContainerItemInfo=function()return nil end}
+C_AuctionHouse={
+    MakeItemKey=function(id)return {itemID=id} end,
+    IsThrottledMessageSystemReady=function()return true end,
+    SendSearchQuery=function(key) C_AuctionHouse.lastSearched=key.itemID;C_AuctionHouse.searchCount=(C_AuctionHouse.searchCount or 0)+1 end,
+    GetNumReplicateItems=function()return 1 end,
+    GetReplicateItemInfo=function()return 'Linen',1,5,1,true,1,'',0,0,500,0,nil,nil,nil,nil,0,2589,true end,
+    HasFullOwnedAuctionResults=function()return true end,
+    GetOwnedAuctions=function()return {} end,
+    HasFullItemSearchResults=function()return true end,
+    GetNumItemSearchResults=function()return 1 end,
+    GetItemSearchResultInfo=function(key,i)return {quantity=5,containsOwnerItem=false,containsAccountItem=false,buyoutAmount=500,auctionID=77} end,
+}
+local mail={{'seller_temp_invoice',0,100000,2000,5000,97000,0,0},
+            {'seller',0,0,0,0,0,40000,0},
+            {'buyer',0,0,0,0,0,0,1}}
 function GetInboxNumItems()return #mail,#mail end
 function GetInboxInvoiceInfo(i)local a=mail[i];return a[1],'Linen',nil,a[2],a[3],a[4],a[5],a[6] end
 function GetInboxHeaderInfo(i)local a=mail[i];return nil,nil,nil,nil,a[7],0,30,a[8] end
-local realprint=print;print=function(x) prints[#prints+1]=x end
-local function fire(e) assert(events[e],e);events[e].scripts.OnEvent(events[e],e) end
-dofile('addon/ForeverTrader/Logic.lua');dofile('addon/ForeverTrader/Target.lua');dofile('addon/ForeverTrader/ForeverTrader.lua');fire('PLAYER_LOGIN');SlashCmdList.FOREVERTRADER('market');SlashCmdList.FOREVERTRADER('start');fire('MAIL_SHOW');fire('MAIL_INBOX_UPDATE')
+local realprint=print
+print=function(x)prints[#prints+1]=x end
+local function fire(event,...)
+    assert(events[event],event)
+    events[event].scripts.OnEvent(events[event],event,...)
+end
+
+dofile('addon/ForeverTrader/Logic.lua')
+dofile('addon/ForeverTrader/Target.lua')
+dofile('addon/ForeverTrader/ForeverTrader.lua')
+fire('PLAYER_LOGIN')
+SlashCmdList.FOREVERTRADER('market')
+SlashCmdList.FOREVERTRADER('start')
+fire('MAIL_SHOW');fire('MAIL_INBOX_UPDATE')
 assert(ForeverTraderDB.mail3==clock..'|97000|40000|1|0|0',ForeverTraderDB.mail3)
-assert(ForeverTraderDB.coach:match('|COLLECT|'));mail={};fire('MAIL_INBOX_UPDATE');assert(ForeverTraderDB.coach:match('|RETURN|'));fire('MAIL_CLOSED');fire('AUCTION_HOUSE_SHOW');assert(ForeverTraderDB.coach:match('|PLAN|'));fire('REPLICATE_ITEM_LIST_UPDATE');assert(ForeverTraderDB.scan:match('2589:5:500'));
+assert(ForeverTraderDB.coach:match('|COLLECT|'))
+assert(textures[1] and textures[1].color[1]==1,'MAIL voice marker should turn pink')
+mail={};fire('MAIL_INBOX_UPDATE')
+assert(ForeverTraderDB.coach:match('|RETURN|'))
+assert(math.abs(textures[1].color[2]-.85)<.01,'AH voice marker should turn green')
+fire('MAIL_CLOSED')
+fire('AUCTION_HOUSE_SHOW')
+assert(ForeverTraderDB.coach:match('|PLAN|'))
+fire('REPLICATE_ITEM_LIST_UPDATE')
+assert(ForeverTraderDB.scan:match('2589:5:500'))
 assert(Auctionator.EventBus.event=='incremental_scan_complete')
 Auctionator.EventBus.listener.ReceiveEvent(nil,'incremental_scan_complete',{
  {itemKey={itemID=2589,itemLevel=0,itemSuffix=0},minPrice=125,totalQuantity=90},
  {itemKey={itemID=2572,itemSuffix=2},minPrice=50,totalQuantity=10},
  {itemKey={itemID=2592},minPrice=200,totalQuantity=50},
 })
-assert(ForeverTraderDB.browseSummary==clock..';2589:125:90;2592:200:50',ForeverTraderDB.browseSummary);
-assert(ForeverTraderDB.coach:match('|PLAN|'));
--- Manual search must work without a desktop plan, and only send a read-only AH query.
+assert(ForeverTraderDB.browseSummary==clock..';2589:125:90;2592:200:50',ForeverTraderDB.browseSummary)
+
+-- Explicit search is always read-only, even without an imported plan.
 SlashCmdList.FOREVERTRADER('search 2589')
 assert(C_AuctionHouse.lastSearched==2589)
-fire('ITEM_PURCHASED');assert(ForeverTraderDB.coach:match('|MAIL|'));
+-- Reconnect after the old search timeout with a valid desktop trading plan.
+clock=clock+40
+ForeverTraderDB.planText='FT3|eu-2-110|'..clock..'|'..(clock+900)..';2589:140:10:200:0'
+fire('PLAYER_LOGIN')
+SlashCmdList.FOREVERTRADER('start')
+fire('AUCTION_HOUSE_SHOW')
+SlashCmdList.FOREVERTRADER('auto on')
+local before=C_AuctionHouse.searchCount or 0
+clock=clock+6
+frames[1].scripts.OnUpdate(frames[1],5)
+assert(C_AuctionHouse.searchCount==before+1,'auto queue should send exactly one AH search')
+fire('ITEM_SEARCH_RESULTS_UPDATED',{itemID=2589})
+local after=C_AuctionHouse.searchCount
+clock=clock+6
+frames[1].scripts.OnUpdate(frames[1],5)
+assert(C_AuctionHouse.searchCount==after,'auto queue must pause when a buy signal is actionable')
+SlashCmdList.FOREVERTRADER('auto off')
+assert(not (C_AuctionHouse.searchCount>after),'auto off no more searches')
 SlashCmdList.FOREVERTRADER('live on')
-assert(ForeverTraderDB.wallet:match('|Alliance|3do assert(not v:match('Fout:'),v)end
-realprint('Lua client mock: mailbox invoice, events, scan and purchase transition OK')
-))
+assert(ForeverTraderDB.wallet:match('|Alliance|3$'))
+fire('ITEM_PURCHASED');assert(ForeverTraderDB.coach:match('|MAIL|'))
 local beforeLogoutWallet=ForeverTraderDB.wallet
-function GetMoney() return 0 end
+currentMoney=0
 fire('PLAYER_LOGOUT')
-assert(ForeverTraderDB.wallet==beforeLogoutWallet,'logout must not overwrite valid gold with 0g')
+assert(ForeverTraderDB.wallet==beforeLogoutWallet,'logout must not overwrite wallet with 0g')
 for _,v in ipairs(prints)do assert(not v:match('Fout:'),v)end
-realprint('Lua client mock: mailbox invoice, events, scan and purchase transition OK')
+realprint('Lua client mock: auto AH search, dual audio marker, wallet and mail checks OK')
