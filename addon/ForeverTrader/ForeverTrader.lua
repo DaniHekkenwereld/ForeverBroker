@@ -210,14 +210,22 @@ local function searchNext(id)
         else say('Wacht op AH-resultaten.');return end
         lastQuery=now();pending.at=now();return
     end
-    if not plan or now()>=plan.expires then say('Laad eerst een actuele planning.');return end
-    local r=T.choose(plan,targetBook,bags,listed,now(),lastTry)
-    if id then r=nil;for _,x in ipairs(plan.rows) do if x.id==id then r=x;break end end end
+    -- Explicit /ft search <itemID> is a read-only diagnostic even without a
+    -- current desktop plan. It never creates a buyable plan row.
+    if id and (type(id)~='number' or id<1 or id>10000000 or id~=math.floor(id)) then say('Ongeldig itemID.');return end
+    local r
+    if id then
+        r={id=id,monitor=true,qty=0,max=0,target=0,hold=0}
+    else
+        if not plan or now()>=plan.expires then say('Laad eerst een actuele planning of gebruik /ft search <itemID> voor een losse prijscontrole.');return end
+        r=T.choose(plan,targetBook,bags,listed,now(),lastTry)
+    end
     if not r then say('Geen nieuw item te controleren.');return end
     local key=a.MakeItemKey(r.id);if not key then return end
     pending={id=r.id,at=now()};lastQuery=now();lastTry[r.id]=now();targetBook[r.id]=nil
     local ok,err=pcall(a.SendSearchQuery,key,{{sortOrder=0,reverseSort=false}},true)
-    if not ok then pending=nil;say('Zoeken mislukt: '..tostring(err)) end
+    if not ok then pending=nil;say('Zoeken mislukt: '..tostring(err))
+    else say('AH-zoekopdracht verstuurd: '..name(r.id)..'. Wacht op resultaat.') end
     update()
 end
 local function mailSignal() if HasNewMail then local has=HasNewMail() and true or false;if has and not s.lastMailSignal and not s.mailOpen then s.mailAlert=true end;s.lastMailSignal=has end end
