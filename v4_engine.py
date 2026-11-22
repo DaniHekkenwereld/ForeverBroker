@@ -6,6 +6,7 @@ A plan contains search/verification targets, not authorization to buy.
 import hashlib
 import json
 import math
+import statistics
 from collections import Counter
 
 import opportunities
@@ -68,13 +69,36 @@ def _target_and_margin(item,cfg):
     return (target,net,roi,deposit) if net>0 else None
 
 
-def build_character(character, market, market_t, clock, cfg):
+def summarize_history(db, ids, market_t, days=14):
+    """Aggregate past public ASK quotes, never claim transaction fills."""
+    ids=sorted(set(int(i) for i in ids if type(i) is int and i>0))
+    observations={}
+    for start in range(0,len(ids),250):
+        batch=ids[start:start+250]
+        query=('SELECT item_id,t,ask FROM price_history WHERE source=? '
+               'AND t>=? AND t<=? AND ask>0 AND item_id IN ('+
+               ','.join('?' for _ in batch)+') ORDER BY item_id,t')
+        for item,t,ask in db.execute(query,('tk',market_t-days*86400,market_t,*batch)):
+            point=observations.setdefault(item,{'prices':[],'days':set()})
+            point['prices'].append(ask)
+            point['days'].add(t//86400)
+    result={}
+    for i,row in observations.items():
+        prices=sorted(row['prices'])
+        n=len(prices)
+        result[i]=dict(points=n,days=len(row['days']),median=int(statistics.median(prices)),
+                       p25=prices[n//4],p75=prices[(n*3)//4])
+    return result
+
+
+def build_character(character, market, market_t, clock, cfg, history=None):
     """Return a versioned plan and contextual actions for one character.
 
     Ask/lastSoldP are external price indicators; evidence remains unverified.
     Inventory and wallet may be stale. Never infer trade profit from gold delta.
     """
     key=character['character_key']
+    history=history or {}
     bags,listed=_stocks(character)
     money=character.get('gold')
     fresh_market=0<=clock-market_t<=5400
@@ -119,8 +143,11 @@ def build_character(character, market, market_t, clock, cfg):
         x=market.get(item_id) or {}
         target=_target_and_margin(x,cfg)
         sale=_sale_reference(x)
+        h=history.get(item_id,{})
+        historically_cheap=(h.get('points',0)>=12 and h.get('days',0)>=3 and
+                            r['ask']<=h.get('median',0)*.85)
         evidence=(target is not None and r['vol24']>=3 and
-                  sale is not None and sale>=target[0]*.9)
+                  sale is not None and sale>=target[0]*.9 and historically_cheap)
         candidate_cost=r['ask']
         affordable=(fresh_wallet and candidate_cost<=allocated and
                     candidate_cost<=max_item)
@@ -131,7 +158,9 @@ def build_character(character, market, market_t, clock, cfg):
                                 qty=1,model_buy=candidate_cost,
                                 reference_sell=target[0],
                                 model_net=target[1],model_roi=round(target[2],1),
-                                reason='Controleer live AH, exacte variant en echte verkoopbaarheid'))
+                                history_points=h.get('points',0),history_days=h.get('days',0),
+                                historical_median=h.get('median'),
+                                reason='Historisch goedkoop; controleer live AH, exacte variant en verkoopbaarheid'))
         ranked.append(r)
     # Keep scan queue read-only. A publicly observed spread cannot issue a
     # transaction: every row is explicitly max=qty=target=0.
@@ -152,7 +181,8 @@ def build_character(character, market, market_t, clock, cfg):
         wallet_fresh=fresh_wallet,last_seen=character.get('last_seen'),
         gold=money,free_gold_after_reserve=available if fresh_wallet else None,
         reserve=reserve,observed_bag_types=len(bags),observed_auction_types=len(listed),
-        coverage=cov,actions=actions[:40],plan=plan,
+        coverage=cov,history_basis='Verschillen t.o.v. historische publieke vraagprijzen, geen gerealiseerde verkopen',
+        actions=actions[:40],plan=plan,
         warning='Publieke vraagprijzen zijn geen bewezen verkopen; controleer in de game.'
     )
     revision=hashlib.sha256(json.dumps(summary,sort_keys=True,
@@ -182,9 +212,17 @@ def strategy_list(db, clock, cfg):
         market_t=int(latest['t'])
     else:
         market={}; market_t=0
+    # Build the same history evidence once, even with multiple characters.
+    ranked,_=opportunities.rank_market(market,cfg,limit=300,budget_gold=100000)
+    chars=characters.read_all(db)
+    bag_ids=set()
+    for ch in chars:
+        bags,listed=_stocks(ch)
+        bag_ids.update(bags)
+    h=summarize_history(db,[r['id'] for r in ranked]+list(bag_ids),market_t)
     out=[]
-    for char in characters.read_all(db):
-        s=build_character(char,market,market_t,clock,cfg)
+    for char in chars:
+        s=build_character(char,market,market_t,clock,cfg,h)
         save_strategy(db,s)
         out.append(s)
     return out
