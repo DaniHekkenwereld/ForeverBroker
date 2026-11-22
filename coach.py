@@ -1,6 +1,7 @@
 """Manual, short-lived watchlist handoff. Never executes or claims real orders."""
 import json, math, re, html
 import targeted
+import opportunities
 
 def monitor_rows(snapshot_json, c, excluded=(), limit=20):
     """Read-only item IDs for targeted AH checks; never generate BUY/SELL advice."""
@@ -9,19 +10,39 @@ def monitor_rows(snapshot_json, c, excluded=(), limit=20):
     except (ValueError,TypeError,AttributeError):
         return []
     excluded=set(excluded)
-    watch=[]
-    for i in set(c['watchlist'])-excluded:
+    # Read-only scans from ALL item classes. A high second asking price is NOT
+    # proof of a buyer, so every one of these is intentionally a zero-quantity
+    # MONITOR row. Keep a few liquid watchlist items for market coverage.
+    radar,_=opportunities.rank_market(market,c,limit=max(30,limit*4),
+                                     budget_gold=c.get('radar_budget_gold',20))
+    out=[];seen=set(excluded)
+    def append(i,x,reason):
+        if i in seen or len(out)>=limit:return
+        out.append(dict(id=i,name=x.get('name') or f'Item {i}',max=0,qty=0,
+                        target=0,hold=0,strategy='monitor',roi=None,live=False,
+                        reason=reason))
+        seen.add(i)
+    research_limit=max(1,limit-max(1,limit//4))
+    for r in radar:
+        if len(out)>=research_limit:break
+        if r['vol24']<=0:continue
+        x=market.get(r['id'])
+        if x:append(r['id'],x,'Brede kansenradar: alleen AH-onderzoek')
+    watched=[]
+    for i in c['watchlist']:
         x=market.get(i)
-        if not isinstance(x,dict): continue
+        if not isinstance(x,dict):continue
         ask,volume=x.get('ask'),x.get('vol24')
-        if type(ask) is not int or ask<=0 or x.get('nc') or x.get('cls') not in ('Trade Goods','Consumable','Consumables'):
-            continue
-        if type(volume) is not int or volume<max(1,c['min_daily_volume']//2):
-            continue
-        watch.append((volume,i,x))
-    out=[]
-    for volume,i,x in sorted(watch,key=lambda v:(-v[0],v[1]))[:max(0,limit)]:
-        out.append(dict(id=i,name=x.get('name') or f'Item {i}',max=0,qty=0,target=0,hold=0,strategy='monitor',roi=None,live=False))
+        if type(ask) is int and ask>0 and type(volume) is int and volume>=max(1,c['min_daily_volume']//2):
+            watched.append((volume,i,x))
+    for _,i,x in sorted(watched,key=lambda v:(-v[0],v[1])):
+        append(i,x,'Vast volume-watchlist item')
+        if len(out)>=limit:break
+    # If the watchlist is sparse, continue searching the next-best rare items.
+    for r in radar:
+        if len(out)>=limit:break
+        if r['vol24']>0 and market.get(r['id']):
+            append(r['id'],market[r['id']],'Brede kansenradar: alleen AH-onderzoek')
     return out
 
 def encode_plan(rows,made,expires):
@@ -85,7 +106,7 @@ def build_plan(db,c,clock,mode):
     if not out: return '',[], 'Nog geen handelsadviezen of geschikte items voor gerichte prijscontrole.'
     expires=t+5400
     payload=encode_plan(out,t,expires)
-    msg=f'{buy_count} koopkansen, {len(out)-buy_count} controle-items. Controle-items geven nooit zelfstandig koopadvies. Publieke prijsreferentie maximaal 90 min geldig; live AH-controle verplicht.'
+    msg=f'{buy_count} koopkansen, {len(out)-buy_count} controle-items uit de brede markt. Controle-items geven nooit zelfstandig koopadvies. Publieke prijsreferentie maximaal 90 min geldig; live AH-controle verplicht.'
     return payload,out,msg
 
 def panel(db,c,clock,mode):
