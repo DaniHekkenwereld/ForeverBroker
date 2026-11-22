@@ -1,0 +1,14 @@
+# Place behind a private hostname with valid DNS and a TLS certificate.
+# Only the HTTPS reverse proxy is public. The Python server binds 127.0.0.1.
+trade.example.com {
+    encode zstd gzip
+    @api {
+        path /api/v4/* /health
+    }
+    handle @api {
+        reverse_proxy 127.0.0.1:8765
+    }
+    handle {
+        respond "Not found" 404
+    }
+}
