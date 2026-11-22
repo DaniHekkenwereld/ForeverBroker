@@ -1,6 +1,7 @@
--- ForeverTrader v3.5.0 - account-wide per-character inventory snapshots.
+-- ForeverTrader v4.0.0 - account-wide inventory with offline-server strategies.
 local L=ForeverTraderLogic
 local T=ForeverTraderTarget
+local V4=ForeverTraderV4
 local frame=CreateFrame('Frame')
 local function say(s) print('|cffe4ba63ForeverTrader:|r '..s) end
 local function now() return GetServerTime and GetServerTime() or time() end
@@ -153,7 +154,7 @@ local function scan()
 end
 local ui=CreateFrame('Frame','ForeverTraderCoach',UIParent,'BackdropTemplate');ui:SetSize(430,302);ui:SetPoint('CENTER',UIParent,'CENTER',360,0);ui:SetMovable(true);ui:EnableMouse(true);ui:RegisterForDrag('LeftButton');ui:SetScript('OnDragStart',ui.StartMoving);ui:SetScript('OnDragStop',ui.StopMovingOrSizing)
 ui:SetBackdrop({bgFile='Interface/Tooltips/UI-Tooltip-Background',edgeFile='Interface/Tooltips/UI-Tooltip-Border',edgeSize=14});ui:SetBackdropColor(.04,.06,.09,.96)
-local title=ui:CreateFontString(nil,'OVERLAY','GameFontNormalLarge');title:SetPoint('TOPLEFT',14,-12);title:SetText('ForeverTrader 3.5.0')
+local title=ui:CreateFontString(nil,'OVERLAY','GameFontNormalLarge');title:SetPoint('TOPLEFT',14,-12);title:SetText('ForeverTrader 4.0.0')
 local text=ui:CreateFontString(nil,'OVERLAY','GameFontHighlight');text:SetPoint('TOPLEFT',14,-39);text:SetWidth(402);text:SetJustifyH('LEFT');text:SetJustifyV('TOP')
 local close=CreateFrame('Button',nil,ui,'UIPanelCloseButton');close:SetPoint('TOPRIGHT',0,0)
 -- Compact high-contrast communication marker read by local AHK via PixelSearch.
@@ -193,6 +194,7 @@ update=function()
     end
     s.buyCount=#buys;s.sellCount=#sells
     local code,msg=L.next(s,now());bridgeStatus(code);local lines={msg,'Gold '..gold(s.cash)..' | Incoming (laatst gezien) '..gold(s.pending)..' | Klaar (laatst gezien) '..gold(s.ready)}
+    if s.v4PlanLoaded then lines[#lines+1]='V4: serverstrategie geladen voor dit character (/ft v4)' end
     if s.autoSearch then lines[#lines+1]='AUTO ZOEKEN: aan ('..(s.autoSearchCount or 0)..' opdrachten)' end
     if s.live then
         lines[#lines+1]='LIVE TEST: alleen adviezen, transacties zelf klikken!'
@@ -366,10 +368,20 @@ frame:SetScript('OnEvent',function(_,e,...)
             s.loggingOut=false;s.autoSearch=false;s.autoSearchCount=0
             s.live=false;s.liveSpent=0;s.walletKnown=false;s.bagsKnown=false;s.ownedKnown=false
             s.mailKnown=false;s.active=false;s.cash=0;s.ahOpen=false;s.mailOpen=false
-            bags={};listed={};targetBook={};plan=L.plan(db().planText,now())
-            getBags();wallet();mailSignal();ui:Hide()
+            bags={};listed={};targetBook={}
+            getBags();wallet()
+            if V4 then
+                local character=UnitName and UnitName('player')
+                local realm=GetRealmName and GetRealmName()
+                V4.login(db(),now(),realm,character,s.walletKnown and s.cash or nil,bags)
+                plan,s.v4PlanLoaded=V4.plan(db(),now(),realm,character,L)
+                if s.v4PlanLoaded then say('V4-serverstrategie voor '..character..' geladen.') end
+            else plan=L.plan(db().planText,now()) end
+            mailSignal();ui:Hide()
         elseif e=='PLAYER_ENTERING_WORLD' then getBags();wallet()
-        elseif e=='PLAYER_LOGOUT' then s.loggingOut=true;recordCharacter('logout')
+        elseif e=='PLAYER_LOGOUT' then
+            if V4 then V4.logout(db(),now(),s.walletKnown and s.cash or nil,bags) end
+            recordCharacter('logout');s.loggingOut=true
         elseif e=='MAIL_SHOW' then s.mailOpen=true;s.mailKnown=false;s.ahOpen=false;if C_Timer and C_Timer.After then C_Timer.After(1,function() if s.mailOpen then check(function() mailbox();update() end) end end) end
         elseif e=='MAIL_INBOX_UPDATE' then mailbox()
         elseif e=='MAIL_CLOSED' then s.mailOpen=false
@@ -423,8 +435,18 @@ SLASH_FOREVERTRADER1='/ft';SlashCmdList.FOREVERTRADER=function(msg)
         elseif msg=='bought' or msg=='mail' then s.bought=true;s.buyBlocked=true;targetBook={};lastCode=nil
         elseif msg=='search' then searchNext()
         elseif msg:match('^search %d+$') then searchNext(tonumber(msg:match('%d+')))
+        elseif msg=='v4' then
+            ui:Show()
+            local count=V4 and V4.actions(db(),GetRealmName and GetRealmName(),UnitName and UnitName('player'),function(action,id,qty)
+                local verb=action=='REVIEW_SELL' and 'Verkoop controleren' or
+                           action=='VERIFY_BUY' and 'Koopkans controleren' or
+                           action=='CHECK_LISTING' and 'Veiling controleren' or 'Vasthouden'
+                say(verb..': '..name(id)..' x'..qty)
+            end) or 0
+            if count==0 then say('Geen V4-adviezen beschikbaar voor dit character.') end
+            lastCode=nil
         elseif msg=='status' or msg=='' then ui:Show();lastCode=nil
-        else say('/ft start | stop | auto on/off | live on/off | market | plan | bought | mail | search [itemID] | status');return end
+        else say('/ft start | stop | v4 | auto on/off | live on/off | market | plan | bought | mail | search [itemID] | status');return end
         update()
     end)
 end
