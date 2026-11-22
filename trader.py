@@ -533,6 +533,16 @@ def dashboard(db,folder,c,clock,status,localmsg,m,mode):
     body=f'''<!doctype html><html lang="nl"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="refresh" content="30"><title>ForeverTrader 3.3.0</title><style>body{{font:15px system-ui;background:#101720;color:#e7eef6;margin:auto;padding:24px;max-width:1450px}}h1{{font-size:32px;margin:0}}h2{{font-size:19px;margin-top:28px}}p,small{{color:#a8b6c7}}a{{color:#90caf9}}.grid{{display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:10px}}.metric{{padding:14px;background:#202c3a;border-radius:8px}}strong{{display:block;color:#e9c172;font-size:22px}}.scroll{{overflow:auto;max-height:450px}}table{{border-collapse:collapse;width:100%;background:#192432}}th,td{{padding:9px;border-bottom:1px solid #334155;text-align:left;white-space:nowrap}}th{{position:sticky;top:0;background:#263547}}.notice{{border-left:4px solid #e9c172;padding:12px;background:#1b2936}}nav a{{margin-right:14px}}</style><h1>ForeverTrader 3.3.0</h1><p>EU PvP Alliance · {old.esc('FICTIEVE DEMO' if mode=='demo' else 'PAPER TRADING · geen echte orders')} · {old.stamp(clock)}</p><nav><a href="#signals">Signalen</a><a href="#patterns">Patronen</a><a href="#research">Research</a><a href="#diagnostic">Diagnostiek</a></nav><p class="notice">{old.esc(status)}<br>{old.esc(localmsg)}<br>{old.esc(coverage_text)}</p><div class="grid">{cards}</div>{coach.panel(db,c,clock,mode)}<p class="notice"><b>LET OP:</b> Paper winst is uitsluitend boekwinst uit een simulatie, niet echt verdiend gold. Vanaf v3.2 vereisen modelverkopen twee opeenvolgende marktsnapshots op of boven de doelprijs; dat bewijst nog steeds geen echte verkoop. Oude paper trades uit eerdere versies blijven in je database staan. Onverkochte voorraad staat tegen kostprijs.</p><h2 id="daily">Dagplanning: goedkoop inkopen, later verkopen</h2><p>Vaste lokale tijdvensters (Europe/Amsterdam) uit gekoppelde prijswaarnemingen van minimaal vijf volledige voorgaande dagen. Winrate en netto prijsverschil komen uit <b>historische vraagprijzen</b>, niet uit bevestigde aankopen of verkopen. Voor echte gold: actuele AH-prijs en beschikbare aantallen altijd eerst controleren. Strategie 'daily' mag in paper maximaal {c['daily_capital_pct']}% van equity gebruiken, met maximaal {c['daily_item_pct']}% per item en {c['reserve_pct']}% cashreserve.</p><p>{old.esc(daynotice)}</p>{dailytable}<h2>Gerichte itemzoekopdrachten</h2><p>Eigen AH-observaties, apart van publieke historie. Bij reload/logout naar desktop. Geen bewezen verkoopvolume of paper fills.</p>{table(['Tijd UTC','ItemID','Type','Laagste / stuk c','Aantal','Regels'],targetrows)}<h2 id="signals">Handelsbeslissingen</h2>{table(['Tijd','Item','Strategie','Actie','Reden','Koop c','Doel c','Aantal','ROI %'],dec)}<h2>Recente beoordeelde signalen</h2>{table(['Item','Strategie','Reden','Koop c','Doel c','ROI %','Heuristische score'],signals)}<h2>Voorraad</h2>{table(['Item','Strategie','Aantal','Kostprijs','Doel c','Status','Plaatsen','Verloopt'],[(r['name'],r['strategy'],r['qty'],old.gold(r['cost']),r['target'],r['status'],old.stamp(r['list_at']),old.stamp(r['expires'])) for r in db.execute('SELECT * FROM inventory')])}<h2>Incoming gold</h2>{table(['ItemID','Bedrag','Verwacht','Strategie'],[(r['item_id'],old.gold(r['amount']),old.stamp(r['eta']),r['strategy']) for r in db.execute('SELECT * FROM incoming')])}<h2>Resultaat per strategie</h2>{table(['Strategie','Events','Gerealiseerd copper','Modelverkopen'],strat)}<h2>Voorspelling versus resultaat (afgeronde modelorders)</h2>{table(['Strategie','Afgerond','Werkelijk c','Verwacht c','Gem. fout c','ROI %','Gem. uren'],perf)}<h2 id="patterns">Prijsprofielen (ratio t.o.v. baseline)</h2><p>Uur 0–23 lokale tijd; weekly bucket 0 = resetdag. Alleen eerdere afgeronde periodes.</p>{table(['Item','Model','Bucket','Samples','Ratio'],pat)}<h2 id="research">Populatie radar</h2><p>CSV-import, geen directe live census-API. Verandering in waargenomen characters, geen bewijs van vraag.</p>{table(['Level','Characters','Groei %','Laatste','Gekoppelde items'],pp)}<h2>Content kalender</h2>{table(['Tijd UTC','Event','Type','Bron'],ev)}<h2>Crafting radar (indicatief)</h2>{table(['Recept ID','Recept','Profession','Kosten c','Winst c','ROI %','Vol24'],[(i,n,p,cost,profit,round(roi,1),vol) for i,n,p,cost,profit,roi,vol in cr])}<h2>Backtests</h2>{table(['Type','Resultaat'],back)}<h2 id="diagnostic">Historische imports</h2>{table(['ItemID','Status','Succes UTC'],imp)}<h2>Fouten</h2>{table(['Tijd UTC','Component','Melding'],errors)}<h2>Diagnostiek</h2><p>Start EXPORT-DIAGNOSTICS.bat voor een consistente ZIP van database en logs. Een bestaande export: <a href="ForeverTrader-Diagnostics.zip">download</a> (alleen na export). Bronnen: <a href="https://auctionhouse.tk.gg/data/">TK Auction House</a> · <a href="https://classicarmory.gg/forever/census">Classic Armory Census</a>. Externe gegevens zijn niet realtime. Prijzen in copper tenzij anders vermeld.</p></html>'''
     old.atomic(folder/'dashboard.html',body)
 
+def next_market_attempt(last_attempt):
+    """Stay under one market GET per hour and avoid fetching just before
+    the EU Forever snapshot's observed :22 publication cadence."""
+    if not last_attempt:return 0
+    earliest=last_attempt+3600
+    due=dt.datetime.fromtimestamp(earliest,UTC).replace(minute=27,second=0,microsecond=0)
+    if int(due.timestamp())<earliest:due+=dt.timedelta(hours=1)
+    return int(due.timestamp())
+
+
 def market_wait_status(db, clock):
     """Show the persisted fetch cooldown and last result, even after a restart.
 
@@ -543,8 +553,9 @@ def market_wait_status(db, clock):
     last_error = getmeta(db, 'market_last_error', '')
     latest = db.execute('SELECT t FROM market_snapshots ORDER BY t DESC LIMIT 1').fetchone()
     last = f"Laatste opgeslagen snapshot: {old.stamp(latest['t'])}" if latest else 'Nog geen opgeslagen marktdata'
-    if last_attempt and clock < last_attempt + 3600:
-        next_at = old.stamp(last_attempt + 3600)
+    due=next_market_attempt(last_attempt)
+    if last_attempt and clock < due:
+        next_at = old.stamp(due)
         if last_error:
             return f"{last} | Laatste API-fout: {last_error} | Nieuwe poging: {next_at}"
         return f"{last} | Volgende API-poging: {next_at} (max. 1x/uur)"
@@ -575,7 +586,7 @@ def main():
             clock=old.now(); source='demo' if args.demo else 'tk'; fresh=False
             if args.demo:
                 clock=max(clock,getmeta(db,'demo_clock',0)+3600); setmeta(db,'demo_clock',clock); t=clock; m=demo(db,c,t,0); fresh=save_market(db,t,m,clock,source);status='Gesimuleerde markt, 1 uur per stap'
-            elif clock-getmeta(db,'market_attempt',0)>=3600:
+            elif clock>=next_market_attempt(getmeta(db,'market_attempt',0)):
                 setmeta(db,'market_attempt',clock);db.commit()
                 try:
                     t,new=old.parse_market(json.loads(old.get(old.URL))); clock=old.now(); fresh=save_market(db,t,new,clock,source)
