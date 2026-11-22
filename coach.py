@@ -4,13 +4,17 @@ import targeted
 
 def build_plan(db,c,clock,mode):
     if mode=='demo': return '',[], 'Demo: geen planning voor echt gold.'
-    t=db.execute('SELECT MAX(snapshot) FROM trade_decisions').fetchone()[0]
+    # The current market snapshot is authoritative; an old trade-decision batch
+    # must not be handed off as though it refers to the latest market data.
+    latest=db.execute('SELECT t,payload FROM market_snapshots ORDER BY t DESC LIMIT 1').fetchone()
+    last_decision=db.execute('SELECT MAX(snapshot) FROM trade_decisions').fetchone()[0]
+    t=latest['t'] if latest else last_decision
     if not t or not 0<=clock-t<5400: return '',[], 'Geen actuele marktsnapshot (< 90 min).'
     rows=db.execute('''SELECT d.*,i.name,i.vendor FROM trade_decisions d JOIN items i ON i.id=d.item_id
       WHERE d.snapshot=? AND d.strategy IN ('direct','intraday','weekly') AND d.roi IS NOT NULL AND d.confidence>0 AND d.ask>0 AND d.quantity>0
       AND (d.action='BUY_MODEL' OR d.reason IN ('item occupied','cycle limit','item exposure','cash reserve','strategy cap','minimum net ROI incl deposit risk'))''',(t,)).fetchall()
     out=[];seen=set()
-    # Restrict to curated fungible materials; no gear, random suffixes or arbitrary item variants.
+    # Strictly curated materials. An 'observe' entry is not a buy recommendation.
     allowed=set(c['watchlist'])
     def priority(r):
         hold=json.loads(r['details']).get('hold_hours',0)
@@ -21,7 +25,6 @@ def build_plan(db,c,clock,mode):
         dep=max(0,int(d.get('deposit_per_unit',0)));net=target-math.ceil(target*c['cut_pct']/100)-dep
         limit=int(net/(1+c['min_roi_pct']/100)); qty=min(r['quantity'],10000)
         live=targeted.latest(db,i,clock)
-        # Published target remains a ceiling, not a prediction of a guaranteed fill.
         if live is not None:
             qty_live,cost_live=targeted.affordable(live,limit,qty)
             if not qty_live: continue
@@ -31,15 +34,35 @@ def build_plan(db,c,clock,mode):
             roi=r['roi']
         if not 0<limit<target<=100000000: continue
         out.append(dict(id=i,name=r['name'],max=limit,qty=qty,target=target,hold=hold,strategy=r['strategy'],roi=roi,live=live is not None));seen.add(i)
-        if len(out)>=20: break
+        if len(out)>=20:break
+    buy_count=len(out)
+    # Even without a BUY_MODEL candidate we still need a useful targeted search
+    # queue. Monitor entries use all-zero price/quantity fields, so Lua will
+    # SEARCH them but NEVER turn them into BUY/SELL advice without a real signal.
+    if latest and latest['t']==t and len(out)<20:
+        try: market={int(k):v for k,v in json.loads(latest['payload']).items()}
+        except (ValueError,TypeError): market={}
+        watch=[]
+        for i in allowed-seen:
+            x=market.get(i)
+            if not isinstance(x,dict): continue
+            ask=x.get('ask'); volume=x.get('vol24')
+            if type(ask) is not int or ask<=0 or x.get('nc') or x.get('cls') not in ('Trade Goods','Consumable','Consumables'): continue
+            if type(volume) is not int or volume<max(1,c['min_daily_volume']//2): continue
+            watch.append((volume,i,x))
+        for volume,i,x in sorted(watch,key=lambda v:(-v[0],v[1])):
+            out.append(dict(id=i,name=x.get('name') or f'Item {i}',max=0,qty=0,target=0,hold=0,strategy='monitor',roi=None,live=False))
+            if len(out)>=20:break
+    if not out: return '',[], 'Nog geen handelsadviezen of geschikte items voor gerichte prijscontrole.'
     expires=t+5400
     payload=f'FT3|eu-2-110|{t}|{expires};'+';'.join(f"{r['id']}:{r['max']}:{r['qty']}:{r['target']}:{r['hold']}" for r in out)
-    return payload,out, f'{len(out)} items; prijsreferentie maximaal 90 min geldig; actuele stackprijs zelf controleren.'
+    msg=f'{buy_count} koopkansen, {len(out)-buy_count} controle-items. Controle-items geven nooit zelfstandig koopadvies. Prijsreferentie maximaal 90 min geldig.'
+    return payload,out,msg
 
 def panel(db,c,clock,mode):
     payload,rows,msg=build_plan(db,c,clock,mode); e=html.escape
-    lines=''.join(f'<tr><td>{e(str(r["name"]))}</td><td>{r["qty"]}</td><td>{r["max"]}</td><td>{r["target"]}</td><td>{r["hold"]}</td><td>{e(r["strategy"])}</td><td>{"LIVE" if r["live"] else "Historisch"}</td><td>{r["roi"]:.1f}%</td></tr>' for r in rows)
-    return f'''<section class="notice"><h2 style="margin-top:0">In-game handelscoach</h2><p>{e(msg)}</p><p>Open WoW: /ft start, /ft market (eenmalig), /ft plan. Kopieer onderstaande regel, plak in het invoerveld in WoW en druk Enter. Ververs de lijst na nieuwe marktdata. De coach gebruikt direct de verse in-game prijzen; desktop leest die na reload/logout. De coach gebruikt echte wallet, zichtbare mail, bags en gerichte AH-zoekresultaten, maximaal 2 min oud; geen automatische orders.</p><textarea id="coachplan" readonly rows="3" style="width:98%" onclick="this.select()">{e(payload)}</textarea><button onclick="document.getElementById('coachplan').select();navigator.clipboard?.writeText(document.getElementById('coachplan').value).catch(()=>{{}})">Selecteer / kopieer planning</button><p>Prijzen per stuk in copper. Verkoopdoel is geen gegarandeerde opbrengst.</p><table><tr><th>Item</th><th>Max stuks</th><th>Max koop</th><th>Doel</th><th>Hold uren</th><th>Strategie</th><th>Bron</th><th>ROI</th></tr>{lines}</table></section>'''
+    lines=''.join(f'<tr><td>{e(str(r["name"]))}</td><td>{r["qty"]}</td><td>{r["max"]}</td><td>{r["target"]}</td><td>{r["hold"]}</td><td>{e(r["strategy"])}</td><td>{"LIVE" if r["live"] else "Historisch"}</td><td>{"—" if r["roi"] is None else f"{r['roi']:.1f}%"}</td></tr>' for r in rows)
+    return f'''<section class="notice"><h2 style="margin-top:0">In-game handelscoach</h2><p>{e(msg)}</p><p>Open WoW: /ft start, /ft market (eenmalig), /ft plan. Kopieer onderstaande regel, plak in het invoerveld in WoW en druk Enter. Ververs de lijst na nieuwe marktdata. De coach gebruikt direct de verse in-game prijzen; desktop leest die na reload/logout. De coach gebruikt echte wallet, zichtbare mail, bags en gerichte AH-zoekresultaten, maximaal 2 min oud; geen automatische orders.</p><textarea id="coachplan" readonly rows="3" style="width:98%" onclick="this.select()">{e(payload)}</textarea><button onclick="document.getElementById('coachplan').select();navigator.clipboard?.writeText(document.getElementById('coachplan').value).catch(()=>{{}})">Selecteer / kopieer planning</button><p>Prijzen per stuk in copper. Regels met strategie monitor zijn alleen voor gerichte prijscontrole (geen koopadvies).</p><table><tr><th>Item</th><th>Max stuks</th><th>Max koop</th><th>Doel</th><th>Hold uren</th><th>Strategie</th><th>Bron</th><th>ROI</th></tr>{lines}</table></section>'''
 
 def extras(text):
     """Constrained read only parser for new optional strings; never runs Lua."""

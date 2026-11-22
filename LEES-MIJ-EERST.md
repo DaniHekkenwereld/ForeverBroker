@@ -30,3 +30,10 @@ EU PvP Alliance. Windows. Eerst paper trading; echte transacties blijven handmat
 - Zelf zoeken werkt ook: de coach luistert naar item- en commodity-resultaatevents. Geen volledige resultaten, onbekend eigendom, oude prijzen of geen aanbod = geen koopadvies. De desktop bewaart maximaal 500 nog beschikbare zoekobservaties uit de addonexport per import; reeds geïmporteerde observaties blijven behouden.
 - De twee minuten zijn een lokale geldigheidstermijn, niet een garantie voor de prijs of serverlimiet. Voor directe flips blijft de verkoopdoelprijs een schatting.
 - Testen: 30 Python-tests, Lua-coach, gesimuleerde client en gerichte zoeklogica. Echte Forever-client en Windows-installatie nog valideren.
+
+## Hotfix 3.1.1 – planning en gerichte prijscontroles
+- Verhelpt het afkeuren van FT3-regels na plakken met verdubbelde `|`-tekens of extra witruimte in de WoW-invoer.
+- Stuurt naast echte koopkansen ook monitor-items door uit de bestaande watchlist wanneer de markt nog geen harde koopsignalen oplevert. Monitor-items zijn **nooit koopadvies**: ze kunnen uitsluitend gericht worden gezocht en leveren observaties voor de database.
+- Herhaalt niet steeds hetzelfde monitor-item zolang andere nog niet zijn gecontroleerd.
+- Een volledige Auctionator-scan moet apart in WoW worden uitgevoerd; `Full scan: nog niet ontvangen` betekent dat de addon nog geen scanresultaat heeft gezien.
+- De desktop leest SavedVariables pas na `/reload` of uitloggen. Bij meer dan een gevonden WoW-accountmap moet `account_folder` in `config.json` worden ingesteld.

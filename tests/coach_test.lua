@@ -3,6 +3,10 @@ local L=ForeverTraderLogic
 local t=1800000000
 local p=assert(L.plan('FT3|eu-2-110|'..t..'|'..(t+5400)..';2589:100:20:150:0;10620:100:20:200:6',t))
 assert(#p.rows==2)
+local monitor=assert(L.plan(' FT3||eu-2-110||'..t..'||'..(t+5400)..';2589:0:0:0:0\n',t))
+assert(#monitor.rows==1 and monitor.rows[1].monitor)
+local mb,ms=L.matches(monitor,{[2589]={floor=1,at=t,stacks={{qty=20,cost=20}}}},{[2589]=20},500000,150000,t,t,{},true)
+assert(#mb==0 and #ms==0)
 assert(not L.plan('FT3|eu-2-110|'..t..'|'..(t+1)..';2589:100:20:150:0',t+2))
 assert(not L.plan('FT3|eu-2-110|'..t..'|'..(t+1)..';2589:100:20:150:0;2589:100:20:150:0',t))
 assert(not L.plan('FT3|eu-2-111|'..t..'|'..(t+5400)..';2589:100:20:150:0',t))

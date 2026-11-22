@@ -1,4 +1,4 @@
--- ForeverTrader v3.1 - read-only companion. No protected actions or movement.
+-- ForeverTrader v3.1.1 - read-only companion. No protected actions or movement.
 local L=ForeverTraderLogic
 local T=ForeverTraderTarget
 local frame=CreateFrame('Frame')
@@ -74,7 +74,7 @@ local function scan()
 end
 local ui=CreateFrame('Frame','ForeverTraderCoach',UIParent,'BackdropTemplate');ui:SetSize(430,302);ui:SetPoint('CENTER',UIParent,'CENTER',360,0);ui:SetMovable(true);ui:EnableMouse(true);ui:RegisterForDrag('LeftButton');ui:SetScript('OnDragStart',ui.StartMoving);ui:SetScript('OnDragStop',ui.StopMovingOrSizing)
 ui:SetBackdrop({bgFile='Interface/Tooltips/UI-Tooltip-Background',edgeFile='Interface/Tooltips/UI-Tooltip-Border',edgeSize=14});ui:SetBackdropColor(.04,.06,.09,.96)
-local title=ui:CreateFontString(nil,'OVERLAY','GameFontNormalLarge');title:SetPoint('TOPLEFT',14,-12);title:SetText('ForeverTrader 3.1')
+local title=ui:CreateFontString(nil,'OVERLAY','GameFontNormalLarge');title:SetPoint('TOPLEFT',14,-12);title:SetText('ForeverTrader 3.1.1')
 local text=ui:CreateFontString(nil,'OVERLAY','GameFontHighlight');text:SetPoint('TOPLEFT',14,-39);text:SetWidth(402);text:SetJustifyH('LEFT');text:SetJustifyV('TOP')
 local close=CreateFrame('Button',nil,ui,'UIPanelCloseButton');close:SetPoint('TOPRIGHT',0,0)
 local lastCode,lastNotify=nil,0
@@ -191,7 +191,7 @@ frame:SetScript('OnEvent',function(_,e,...)
 end)
 local elapsed=0; frame:SetScript('OnUpdate',function(_,dt) elapsed=elapsed+dt;if elapsed>=5 then elapsed=0;if s.active then check(function() mailSignal();update() end) end end end)
 local input=CreateFrame('EditBox','ForeverTraderPlanInput',ui,'InputBoxTemplate');input:SetSize(390,22);input:SetPoint('BOTTOM',0,36);input:SetAutoFocus(false);input:SetMaxLetters(12000);input:Hide()
-input:SetScript('OnEnterPressed',function(self) local p,err=L.plan(self:GetText(),now());if not p then say(err);return end;plan=p;db().planText=self:GetText();self:SetText('');self:ClearFocus();self:Hide();say('Planning geladen: '..#p.rows..' items.');update() end)
+input:SetScript('OnEnterPressed',function(self) local p,err=L.plan(self:GetText(),now());if not p then say(err);return end;plan=p;db().planText=self:GetText();self:SetText('');self:ClearFocus();self:Hide();say('Planning geladen: '..#p.rows..' items (inclusief alleen-controleren).');update() end)
 input:SetScript('OnEscapePressed',function(self) self:ClearFocus();self:Hide() end)
 local function button(label,x,fn) local b=CreateFrame('Button',nil,ui,'UIPanelButtonTemplate');b:SetSize(124,22);b:SetPoint('BOTTOMLEFT',x,10);b:SetText(label);b:SetScript('OnClick',fn);return b end
 button('Planning plakken',12,function() input:Show();input:SetFocus() end)

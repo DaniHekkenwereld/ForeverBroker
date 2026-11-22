@@ -42,7 +42,7 @@ function T.choose(plan,book,bags,listed,at,lastTry)
     for _,r in ipairs(plan.rows) do
         local b=book[r.id];local tried=lastTry[r.id] or 0
         if at-tried>=30 and (not b or not b.at or at-b.at>=120) then
-            local rank=((bags[r.id] or 0)>0 and 2000 or 0) + (r.target/r.max-1)*100/(1+r.hold/12)
+            local rank=r.monitor and (-100 - (tried>0 and 1000 or 0) + math.min((at-tried)/3600,24)) or (((bags[r.id] or 0)>0 and 2000 or 0) + (r.target/r.max-1)*100/(1+r.hold/12))
             if ((bags[r.id] or 0)>0 or ((listed or {})[r.id] or 0)==0) and (not best or rank>score) then best,score=r,rank end
         end
     end

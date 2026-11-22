@@ -18,3 +18,6 @@ a.HasFullCommoditySearchResults=function()return true end;a.GetNumCommoditySearc
 id,b=T.read(a,'commodity',2589,t);buys=L.matches(p,{[id]=b},{},500000,150000,t,nil,{},true);assert(buys[1].qty==20 and buys[1].cost==1600)
 assert(T.choose(p,{}, {},{},t,{}).id==2589);assert(not T.choose(p,{[2589]=b},{},{},t,{}));assert(T.choose(p,{[2589]=b},{},{},t+120,{}).id==2589)
 print('Lua targeted: stack totals, unit prices, own auction exclusion, empty, partial, expiry, selection PASS')
+
+local t=1800000000;local mp={expires=t+1000,rows={{id=2589,max=0,qty=0,target=0,hold=0,monitor=true}}};local r=ForeverTraderTarget.choose(mp,{}, {},{},t,{})
+assert(r and r.id==2589)

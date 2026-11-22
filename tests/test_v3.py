@@ -14,6 +14,21 @@ class CoachTests(unittest.TestCase):
   self.add(99999);self.add(2589,reason='holding horizon limit');self.add(10620,hold=6);p,rows,_=coach.build_plan(self.db,self.c,self.t,'paper');self.assertEqual([r['id'] for r in rows],[10620]);self.assertEqual(rows[0]['hold'],6)
  def test_cap(self):
   self.add(target=120);_,r,_=coach.build_plan(self.db,self.c,self.t,'paper');self.assertLess(r[0]['max'],100)
+ def test_monitor_fallback_with_real_snapshot(self):
+  m={2589:{'name':'Linen Cloth','ask':100,'ask2':150,'cls':'Trade Goods','vol24':2000,'nc':False},2592:{'name':'Wool Cloth','ask':200,'ask2':240,'cls':'Trade Goods','vol24':1800,'nc':False}}
+  ft.save_market(self.db,self.t,m,self.t,'tk')
+  payload,rows,msg=coach.build_plan(self.db,self.c,self.t,'paper')
+  self.assertEqual(len(rows),2)
+  self.assertTrue(all(r['strategy']=='monitor' and r['max']==0 and r['qty']==0 for r in rows))
+  self.assertIn(';2589:0:0:0:0',payload)
+  self.assertIn('0 koopkansen',msg)
+ def test_monitor_does_not_become_fake_buy(self):
+  m={2589:{'name':'Linen Cloth','ask':100,'cls':'Trade Goods','vol24':2000,'nc':False}}
+  ft.save_market(self.db,self.t,m,self.t,'tk')
+  _,rows,_=coach.build_plan(self.db,self.c,self.t,'paper')
+  self.assertEqual(rows[0]['strategy'],'monitor')
+ def test_no_handoff_without_market_or_decision(self):
+  self.assertEqual(coach.build_plan(self.db,self.c,self.t,'paper')[0],'')
  def test_local_extras(self):
   a=coach.extras('["mail3"] = "100|20|30|1|0|0",\n["coach"] = "100|MAIL|20|30|0|1|0",\n["bags"] = "100;2589:20",\n["owned"] = "100;2589:1:80",\n["coachLog"] = "100|MAIL|20|30|0|1|0;101|AH|20|0|0|1|0",');self.assertEqual(set(a),{'mail3','coach','bags','owned','coachLog'})
  def test_timing_not_direct_gate(self):
