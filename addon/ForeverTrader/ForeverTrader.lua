@@ -80,7 +80,7 @@ local function scan()
 end
 local ui=CreateFrame('Frame','ForeverTraderCoach',UIParent,'BackdropTemplate');ui:SetSize(430,302);ui:SetPoint('CENTER',UIParent,'CENTER',360,0);ui:SetMovable(true);ui:EnableMouse(true);ui:RegisterForDrag('LeftButton');ui:SetScript('OnDragStart',ui.StartMoving);ui:SetScript('OnDragStop',ui.StopMovingOrSizing)
 ui:SetBackdrop({bgFile='Interface/Tooltips/UI-Tooltip-Background',edgeFile='Interface/Tooltips/UI-Tooltip-Border',edgeSize=14});ui:SetBackdropColor(.04,.06,.09,.96)
-local title=ui:CreateFontString(nil,'OVERLAY','GameFontNormalLarge');title:SetPoint('TOPLEFT',14,-12);title:SetText('ForeverTrader 3.2.0')
+local title=ui:CreateFontString(nil,'OVERLAY','GameFontNormalLarge');title:SetPoint('TOPLEFT',14,-12);title:SetText('ForeverTrader 3.3.0')
 local text=ui:CreateFontString(nil,'OVERLAY','GameFontHighlight');text:SetPoint('TOPLEFT',14,-39);text:SetWidth(402);text:SetJustifyH('LEFT');text:SetJustifyV('TOP')
 local close=CreateFrame('Button',nil,ui,'UIPanelCloseButton');close:SetPoint('TOPRIGHT',0,0)
 local lastCode,lastNotify=nil,0
