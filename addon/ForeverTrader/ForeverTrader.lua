@@ -1,4 +1,4 @@
--- ForeverTrader v3.4.1 - account-wide per-character inventory snapshots.
+-- ForeverTrader v3.5.0 - account-wide per-character inventory snapshots.
 local L=ForeverTraderLogic
 local T=ForeverTraderTarget
 local frame=CreateFrame('Frame')
