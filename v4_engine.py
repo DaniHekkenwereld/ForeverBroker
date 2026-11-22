@@ -119,7 +119,7 @@ def build_character(character, market, market_t, clock, cfg):
         x=market.get(item_id) or {}
         target=_target_and_margin(x,cfg)
         sale=_sale_reference(x)
-        evidence=(target is not None and x.get('vol24',0)>=3 and
+        evidence=(target is not None and r['vol24']>=3 and
                   sale is not None and sale>=target[0]*.9)
         candidate_cost=r['ask']
         affordable=(fresh_wallet and candidate_cost<=allocated and
@@ -204,11 +204,31 @@ def normalize_session(x,received_at):
         raise ValueError('Invalid character key')
     if any(type(t) is not int for t in (started,ended)) or not 0<started<=ended<=received_at+300:
         raise ValueError('Invalid session times')
-    # Inventory state and gold deltas are *observations*. They cannot prove
-    # what was bought or sold without an explicit trade record.
+    gold_start=x.get('gold_start')
+    gold_end=x.get('gold_end')
+    if any(v is not None and (type(v) is not int or not 0<=v<=9007199254740991)
+           for v in (gold_start,gold_end)):
+        raise ValueError('Invalid gold observation')
+    def normalize_stock(field):
+        raw=x.get(field)
+        if raw is None:return None
+        if type(raw) is not dict or len(raw)>2000:raise ValueError('Invalid bag snapshot')
+        out={}
+        for i,q in raw.items():
+            if not str(i).isdigit() or type(q) is not int or not 0<q<=10000000:
+                raise ValueError('Invalid item amount')
+            out[str(int(i))]=q
+        return out
+    first=normalize_stock('bags_start')
+    last=normalize_stock('bags_end')
+    delta=None
+    if first is not None and last is not None:
+        delta={i:last.get(i,0)-first.get(i,0) for i in set(first)|set(last)
+               if last.get(i,0)!=first.get(i,0)}
+    # These are observational deltas, NOT verified transactions.
     return {'id':id,'character_key':key,'started_at':started,'ended_at':ended,
-            'gold_start':x.get('gold_start') if type(x.get('gold_start')) is int else None,
-            'gold_end':x.get('gold_end') if type(x.get('gold_end')) is int else None,
+            'gold_start':gold_start,'gold_end':gold_end,
+            'bags_start':first,'bags_end':last,'inventory_delta':delta,
             'source':'addon_saved_variables','verified_transactions':False}
 
 
