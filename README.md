@@ -1,6 +1,6 @@
 # ForeverBroker
 
-ForeverTrader **v3.3.1** — tradingcoach, conservatievere paper-tradingengine en optionele live-goldtest met handmatige transacties voor WoW Forever EU PvP Alliance.
+ForeverTrader **v3.4.0** — tradingcoach, conservatievere paper-tradingengine en optionele live-goldtest met handmatige transacties voor WoW Forever EU PvP Alliance.
 
 ## Bijwerken (Windows)
 
@@ -18,6 +18,16 @@ Daarna gebruik je bij iedere nieuwe versie alleen:
 ```
 
 Sluit eerst WoW en `START.bat`. De updater bewaart `config.json` en `data/` en vernieuwt, wanneer `wow_folder` is ingesteld, ook de WoW-addon. In een Git-clone gebruikt de updater `git pull --ff-only` (lokale wijzigingen kunnen dat blokkeren).
+
+## Nieuw in 3.4: bekijk alle items, niet alleen materialen
+
+- De nieuwe **brede kansenradar** beoordeelt alle items uit de publieke marktfeed, óók BoE-armor, wapens, recipes, containers, pets en ongebruikelijke items.
+- De oude `nc=true`/Trade Goods-beperkingen blijven alleen bestaan waar de **oude paper-handelsstrategie** ze bewust gebruikt; de brede radar en AH-zoekwachtrij hebben die beperking niet.
+- Items worden geselecteerd op het theoretische prijsverschil na AH-cut en deposit, geschatte nettowinst in gold, meldingen over eerdere verkopen en budget. Een tweede hogere AH-vraagprijs is nog geen bewezen verkoop.
+- De FT3-planning stuurt nieuwe kansrijke itemIDs door als **monitor** (`max=0, qty=0`): automatisch zoeken bij het AH, nooit automatisch kopen op basis van een onbetrouwbare openbare spread.
+- De detailhistorie-import richt zich voortaan ook op uitzonderlijke niet-commodities. Bronlimieten blijven gelden.
+
+[Handleiding en concrete voorbeelden uit je diagnosebestand](docs/ALL-ITEMS-3.4.md).
 
 ## Nieuw in 3.3.1: automatisch AH zoeken + AHK-audiocues
 
