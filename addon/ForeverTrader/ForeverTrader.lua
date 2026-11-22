@@ -85,13 +85,22 @@ local text=ui:CreateFontString(nil,'OVERLAY','GameFontHighlight');text:SetPoint(
 local close=CreateFrame('Button',nil,ui,'UIPanelCloseButton');close:SetPoint('TOPRIGHT',0,0)
 -- Compact high-contrast communication marker read by local AHK via PixelSearch.
 local voiceMarker=ui:CreateTexture(nil,'OVERLAY')
-voiceMarker:SetSize(22,22);voiceMarker:SetPoint('TOPRIGHT',-34,-10)
+voiceMarker:SetSize(18,18);voiceMarker:SetPoint('TOPRIGHT',-64,-10)
+local voiceSignature=ui:CreateTexture(nil,'OVERLAY')
+voiceSignature:SetSize(18,18);voiceSignature:SetPoint('LEFT',voiceMarker,'RIGHT',6,0)
 local function bridgeStatus(code)
     local state=(code=='MAIL' or code=='MAIL_CHECK' or code=='COLLECT' or code=='MAIL_WAIT') and 'MAIL'
                 or (code=='AH' or code=='RETURN') and 'AH' or 'IDLE'
-    if state=='MAIL' then voiceMarker:SetColorTexture(1,.16,.33,1)
-    elseif state=='AH' then voiceMarker:SetColorTexture(.07,.85,.55,1)
-    else voiceMarker:SetColorTexture(.10,.14,.19,1) end
+    if state=='MAIL' then
+        voiceMarker:SetColorTexture(1,.16,.33,1)
+        voiceSignature:SetColorTexture(.4,0,.13,1)
+    elseif state=='AH' then
+        voiceMarker:SetColorTexture(.07,.85,.55,1)
+        voiceSignature:SetColorTexture(.02,.25,.10,1)
+    else
+        voiceMarker:SetColorTexture(.10,.14,.19,1)
+        voiceSignature:SetColorTexture(.10,.14,.19,1)
+    end
     s.voiceState=state
 end
 local lastCode,lastNotify=nil,0
