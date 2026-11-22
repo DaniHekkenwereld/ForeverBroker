@@ -1,4 +1,10 @@
-# ForeverTrader 3.2 – Getting started
+# ForeverTrader 3.3 – Getting started
+
+## 3.3: Dagplanning op lokale uren
+
+Het dashboard toont nu **dagelijkse inkoop- en verkoopvensters** per item met voldoende prijswaarnemingen (minstens 5 volledige dagen). De strategie gebruikt de historisch waargenomen prijsverschillen na AH-cut en vereist voldoende herhaalbare verbetering voordat hij een paper-koopkandidaat maakt. Bij betrouwbare daghandel mag het paper-model maximaal 75% van zijn equity gebruiken, met 35% per item en 20% cashreserve. **Dit is geen garantie dat items daadwerkelijk verkopen.** De echte-goldtest heeft nog steeds een maximum van 5g per sessie en vereist handmatige bevestiging van alle AH-transacties.
+
+Meer uitleg: [docs/DAGHANDEL-3.3.md](docs/DAGHANDEL-3.3.md). Je update gewoon met `.\\UPDATE.bat`. Je data en config.json blijven bewaard.
 
 ## 3.2: live-goldtest (let op: geen onbewaakte bot)
 De standaardmodus blijft paper trading. Je kunt binnen WoW optioneel `/ft live on` gebruiken **bij het geopende AH** na `/ft market`, `/ft start` en het laden van een FT3-planning. De coach laat dan uitsluitend koopadviezen door die gebaseerd zijn op AH-zoekresultaten jonger dan 60 seconden, met maximaal 1g per advies, 5g per sessie en minimaal 15g of 20% walletreserve. **Je moet de daadwerkelijke aankopen en verkoopplaatsingen zelf bevestigen.** De addon automatiseert dat niet. Schakel uit met `/ft live off`. Alle details: [docs/LIVE-TEST-3.2.md](docs/LIVE-TEST-3.2.md).
