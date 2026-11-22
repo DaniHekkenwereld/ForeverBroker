@@ -121,9 +121,26 @@ def parse_history(db,data,i,clock):
         if 0<ms//1000<=clock and min(p,q)>0: db.execute('INSERT OR REPLACE INTO sales_history VALUES(?,?,?,?,?)',(i,ms//1000,p,q,sure))
     return len(times)
 
+def history_priority(x,c):
+    """Rank candidates for expensive hourly-history imports by investable spread,
+    not by 24h volume alone. These are research priorities, NOT buy signals."""
+    volume=x.get('vol24')
+    depth=x.get('depth5')
+    vals=sorted(v for v in x.get('history',[]) if type(v) is int and v>0)
+    if (type(volume) is not int or type(depth) is not int or
+        volume<c['min_daily_volume'] or depth<=0 or len(vals)<12):
+        return (0,max(0,volume or 0))
+    low=vals[len(vals)//4];high=vals[(len(vals)*3)//4]
+    net=max(0,high-math.ceil(high*c['cut_pct']/100)-low)
+    item_pct=c.get('daily_item_pct',35)
+    funding=int(c['starting_gold']*10000*item_pct/100)
+    qty=min(depth,max(1,volume//6),max(1,funding//low))
+    return (net*qty,volume)
+
+
 def import_history(db,c,m,clock,limit=None):
     # Small rotating watchlist, no bulk crawling. Retry after >=24h, successful history after 7d.
-    ranked=sorted((i for i,x in m.items() if not x.get('nc') and type(x.get('vol24')) is int and x['vol24']>=c['min_daily_volume']),key=lambda i:-m[i]['vol24'])
+    ranked=sorted((i for i,x in m.items() if not x.get('nc') and x.get('cls') in ('Trade Goods','Consumable','Consumables') and type(x.get('vol24')) is int and x['vol24']>=c['min_daily_volume']),key=lambda i:history_priority(m[i],c),reverse=True)
     ids=list(dict.fromkeys(c['watchlist']+ranked))[:c['history_max_items']]
     done=0
     for i in ids:
