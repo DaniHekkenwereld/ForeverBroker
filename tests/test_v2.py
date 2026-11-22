@@ -1,4 +1,5 @@
 import unittest, tempfile, pathlib, json, sqlite3, zipfile, datetime as dt
+from contextlib import closing
 import trader as ft
 import legacy as old
 class V2Tests(unittest.TestCase):
@@ -42,7 +43,10 @@ class V2Tests(unittest.TestCase):
         path=ft.export(self.db,self.folder,self.c)
         with zipfile.ZipFile(path) as z:
             self.assertIsNone(z.testzip());self.assertIn('trader.sqlite',z.namelist());self.assertNotIn('wow_folder',json.loads(z.read('config.json')));self.assertIn('trade_decisions.csv',z.namelist());self.assertIn('predictions.csv',z.namelist());p=self.folder/'restored.sqlite';p.write_bytes(z.read('trader.sqlite'))
-        with sqlite3.connect(p) as db:self.assertEqual(db.execute('pragma integrity_check').fetchone()[0],'ok')
+        # sqlite3 connection context manager commits/rolls back but does not close.
+        # Windows locks restored.sqlite until explicitly closed, breaking tearDown.
+        with closing(sqlite3.connect(p)) as db:
+            self.assertEqual(db.execute('pragma integrity_check').fetchone()[0],'ok')
     def test_backtest_separate(self):
         t=self.t;_,m=old.demo_market(t,0);ft.save_market(self.db,t,m,t,'demo');a=ft.totals(self.db);res=ft.replay(self.db,self.c);self.assertEqual(res['snapshots'],1);self.assertEqual(ft.totals(self.db),a);self.assertEqual(self.db.execute('select count(*) from transactions').fetchone()[0],0)
     def test_stale_data_is_no_order(self):
