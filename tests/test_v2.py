@@ -23,7 +23,12 @@ class V2Tests(unittest.TestCase):
         t=self.t;_,m=old.demo_market(t,0);ft.save_market(self.db,t,m,t,'demo');self.assertTrue(ft.cycle(self.db,self.c,t,m,t,self.vid,'demo'));self.assertFalse(ft.cycle(self.db,self.c,t,m,t+900,self.vid,'demo'))
         a=ft.totals(self.db);self.assertGreater(a['listed'],0);self.assertEqual(a['equity'],a['cash']+a['listed']);self.assertGreaterEqual(a['cash'],200000)
         for x in m.values():x['ask']=10000;x['ask2']=11000;x['sold']=1000
-        ft.cycle(self.db,self.c,t+3600,m,t+3600,self.vid,'demo');a=ft.totals(self.db);self.assertGreater(a['incoming'],0);before=a['cash'];ft.settle(self.db,t+4500);self.assertEqual(ft.totals(self.db)['cash'],before);ft.settle(self.db,t+7200);self.assertEqual(ft.totals(self.db)['cash'],before+a['incoming']);ft.mark_cash(self.db,t+7200);self.assertEqual(self.db.execute("select count(*) from predictions where outcome='model_sold'").fetchone()[0],5)
+        ft.cycle(self.db,self.c,t+3600,m,t+3600,self.vid,'demo');self.assertEqual(ft.totals(self.db)['incoming'],0)
+        self.assertEqual(self.db.execute('select count(*) from paper_sale_checks').fetchone()[0],5)
+        ft.cycle(self.db,self.c,t+7200,m,t+7200,self.vid,'demo');a=ft.totals(self.db);self.assertGreater(a['incoming'],0)
+        before=a['cash'];ft.settle(self.db,t+7500);self.assertEqual(ft.totals(self.db)['cash'],before)
+        ft.settle(self.db,t+10800);self.assertEqual(ft.totals(self.db)['cash'],before+a['incoming'])
+        ft.mark_cash(self.db,t+10800);self.assertEqual(self.db.execute("select count(*) from predictions where outcome='model_sold'").fetchone()[0],5)
     def test_held_deposit_and_expiry(self):
         t=self.t; m=ft.demo(self.db,self.c,t,0); c={**self.c,'strategy_weights':{'direct':0,'intraday':80,'weekly':0}};ft.cycle(self.db,c,t,m,t,self.vid,'demo');self.assertGreater(ft.totals(self.db)['inventory'],0);ft.mark_cash(self.db,t)
         for h in range(1,30):
