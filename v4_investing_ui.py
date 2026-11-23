@@ -70,6 +70,8 @@ def render(report, now, filters=None, budget=None):
         if x.get('confirmed_24h') is not None:
             volume+=' · '+e(x.get('confirmed_24h'))+' bronbevestigd'
         warning=e(x.get('warning'))
+        if x.get('scenario_basis') and x.get('exit_scenario') is not None:
+            warning+='<small class="sub">Scenario: '+e(x['scenario_basis'])+'</small>'
         if x.get('variant_risk'):
             warning+=' · <strong>exacte variant checken</strong>'
         columns=[
@@ -101,7 +103,9 @@ def render(report, now, filters=None, budget=None):
             table+
             '<p class="hint">24u en 7d vergelijken mediane publieke VRAAGPRIJZEN. '
             'Dit zijn geen daadwerkelijk behaalde verkoopprijzen. '
-            '* Verkoopscenario = 95% van de 7d mediaan; geen voorspelling. '
+            '* Korte termijn: 95% van de 7d mediaan; lange termijn: SPECULATIEF '
+            'scenario waarin een week stijging zich herhaalt, afgekapt op +50%. '
+            'Beide scenario’s zijn GEEN voorspellingen of gerealiseerde verkopen. '
             'Max inkoop vergt 20% theoretische marge na AH-cut, '
             'EXCLUSIEF deposit, niet-verkochte voorraad en prijsrisico. '
             'Geen externe vendorwaardes gebruikt.</p>')
