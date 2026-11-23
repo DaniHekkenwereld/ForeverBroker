@@ -264,6 +264,9 @@ def sync_once(prepared_only=False):
     now=int(time.time())
     account=account_identity(path)
     chars=characters.parse_saved_variables(text,now,account)
+    if not chars or not any(' ' in x.get('character','').strip() for x in chars):
+        raise ValueError('Geen volledige Forever-characternaam in de export. '
+                         'Log eenmaal in met de bijgewerkte addon en sluit WoW volledig af.')
     sessions=parse_sessions(text,now,account)
     sessions,skipped=compatible_sessions(chars,sessions,now)
     if skipped:
