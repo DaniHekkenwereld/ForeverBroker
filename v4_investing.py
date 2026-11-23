@@ -132,8 +132,8 @@ def analyze(db,market,at,cfg,clock=None):
         elif discount is not None and discount<=-15 and short_move is not None and short_move>=-3:
             signal='KORT — KOOPDIP';horizon='1–5 dagen'
             why='Minstens 15% onder weekmediaan zonder sterke nieuwe daling'
-        elif (long_move is not None and long_move>=10 and
-              (short_move is None or short_move>=-3) and
+        elif (long_move is not None and 10<=long_move<=70 and
+              (short_move is None or -3<=short_move<=12) and
               discount is not None and discount<=3):
             signal='LANG — OPWAARTS';horizon='1–3 weken'
             why='7-daagse vraagprijsmediaan stijgt tegenover vorige week; instap niet veel hoger dan weekmediaan'
@@ -147,7 +147,13 @@ def analyze(db,market,at,cfg,clock=None):
             signal='VOLGEN';horizon=None
             why='Geen sterk instapmoment uit beschikbare prijs- en volumedata'
         # A hypothetical conservative rebound scenario; NOT a sales forecast.
+        basis='Herstel naar 95% van de historisch gemeten 7d mediaan'
         exit_scenario=int(last7*.95) if history_ok else None
+        if signal.startswith('LANG') and long_move is not None:
+            # Extrapolation is clearly a *what-if* for a later exit, not a
+            # quoted buyer. Never report as an observed future sale.
+            basis='Speculatief: een extra week met dezelfde gemeten weekstijging (max 50%)'
+            exit_scenario=int(last7*(1+min(.50,long_move/100)))
         if exit_scenario is not None and exit_scenario<=ask:
             exit_scenario=None
         # Maximum asking-price entry for >=20% nominal ROI after AH cut;
@@ -181,7 +187,7 @@ def analyze(db,market,at,cfg,clock=None):
             'history_points_7d':n7,'history_days_7d':d7,
             'history_points_prev7d':nprev7,
             'trend':trend,'signal':signal,'horizon':horizon,
-            'exit_scenario':exit_scenario,
+            'exit_scenario':exit_scenario,'scenario_basis':basis,
             'max_buy_before_deposit':max_buy,
             'scenario_margin_before_deposit':margin,
             'scenario_roi_before_deposit':roi,'warning':why,
