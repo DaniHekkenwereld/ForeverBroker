@@ -67,10 +67,17 @@ def parse_sessions(text, now, account):
         raise ValueError('Ongeldig sessieoverzicht')
     result=[]
     key=hashlib.sha256(account.encode('utf-8')).hexdigest()[:24]
+    skipped=0
     for line in lines:
         parts=line.split('|')
         if len(parts)!=9:raise ValueError('Ongeldige sessieregel')
         id,realm,name,start,end,gold_start,gold_end,bags_start,bags_end=parts
+        # Earlier addon versions could create a session before the realm/name
+        # was available on PLAYER_LOGIN. Skip only those orphan records; keep
+        # all valid sessions and character snapshots without altering the file.
+        if not realm or not name:
+            skipped+=1
+            continue
         if not 1<=len(realm)<=100 or not 1<=len(name)<=100:
             raise ValueError('Ongeldige characternaam')
         s=int(start);e=int(end)
@@ -82,6 +89,8 @@ def parse_sessions(text, now, account):
                            gold_end=int(gold_end) if gold_end else None,
                            bags_start=characters.parse_counts(bags_start),
                            bags_end=characters.parse_counts(bags_end)))
+    if skipped:
+        print(f'V4: {skipped} onvolledige sessie(s) zonder characternaam of realm overgeslagen.',flush=True)
     return result
 
 
