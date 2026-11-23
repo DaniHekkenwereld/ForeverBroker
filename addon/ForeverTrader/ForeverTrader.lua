@@ -7,7 +7,29 @@ local function say(s) print('|cffe4ba63ForeverTrader:|r '..s) end
 local function now() return GetServerTime and GetServerTime() or time() end
 local function db() if type(ForeverTraderDB)~='table' then ForeverTraderDB={} end; ForeverTraderDB.schema='FT1';return ForeverTraderDB end
 local function market() return UnitFactionGroup('player') or 'Unknown',tostring(GetCurrentRegion and GetCurrentRegion() or 0) end
-local function realmOK() local a,b=market();return a=='Alliance' and b=='3' and db().pvpConfirmed==true and (not GetRealmName or db().confirmedRealm==GetRealmName()) end
+-- The private-server client may return an empty realm until fully loaded.
+local function validIdentity(v)
+    return type(v)=='string' and #v>0 and #v<=100 and not v:find('[|;#?"\\%c]')
+end
+local function identity()
+    local character=UnitName and UnitName('player') or nil
+    local realm=GetRealmName and GetRealmName() or nil
+    if UnitFullName then
+        local n,r=UnitFullName('player')
+        if not validIdentity(character) and validIdentity(n) then character=n end
+        if not validIdentity(realm) and validIdentity(r) then realm=r end
+    end
+    if not validIdentity(realm) and GetNormalizedRealmName then realm=GetNormalizedRealmName() end
+    if not validIdentity(realm) and GetCVar then realm=GetCVar('realmName') end
+    if not validIdentity(realm) then realm=db().realmOverride end
+    if not validIdentity(realm) or not validIdentity(character) then return nil,nil end
+    return realm,character
+end
+local function realmOK()
+    local f,r=market();local realm=identity()
+    return f=='Alliance' and r=='3' and db().pvpConfirmed==true and
+           realm~=nil and db().confirmedRealm==realm
+end
 local s={active=false,mailOpen=false,ahOpen=false,mailKnown=false,ready=0,pending=0,attachments=0,partial=false,cash=0,reserve=150000,threshold=20000,buyCount=0,sellCount=0,mailAlert=false,bought=false,live=false,liveSpent=0,walletKnown=false,autoSearch=false,autoSearchCount=0}
 local plan,book,bags,buys,sells=nil,{},{},{},{}
 local listed={}
@@ -75,9 +97,8 @@ end
 -- charactersWire is a bounded line-oriented export that desktop Python can parse
 -- safely without executing arbitrary SavedVariables Lua.
 recordCharacter=function(reason)
-    if not UnitName or not GetRealmName then return end
-    local character=UnitName('player');local realm=GetRealmName()
-    if type(character)~='string' or character=='' or type(realm)~='string' or realm=='' then return end
+    local realm,character=identity()
+    if not realm or not character then return end
     local d=db()
     if type(d.characters)~='table' then d.characters={} end
     local key=realm..'#'..character
@@ -134,6 +155,20 @@ recordCharacter=function(reason)
         output[#output+1]=r.line;size=size+#r.line+1
     end
     d.charactersWire=table.concat(output,';')
+end
+
+local function ensureV4Identity(reason)
+    local realm,character=identity()
+    if not realm or not character then return false end
+    recordCharacter(reason or 'identity')
+    if V4 and not db().v4ActiveSession then
+        V4.login(db(),now(),realm,character,s.walletKnown and s.cash or nil,bags)
+        plan,s.v4PlanLoaded=V4.plan(db(),now(),realm,character,L)
+        if s.v4PlanLoaded and reason~='logout' then
+            say('V4-serverstrategie voor '..character..' geladen.')
+        end
+    end
+    return true
 end
 
 local function scan()
@@ -370,17 +405,20 @@ frame:SetScript('OnEvent',function(_,e,...)
             s.mailKnown=false;s.active=false;s.cash=0;s.ahOpen=false;s.mailOpen=false
             bags={};listed={};targetBook={}
             getBags();wallet()
+            plan=nil
             if V4 then
-                local character=UnitName and UnitName('player')
-                local realm=GetRealmName and GetRealmName()
-                V4.login(db(),now(),realm,character,s.walletKnown and s.cash or nil,bags)
-                plan,s.v4PlanLoaded=V4.plan(db(),now(),realm,character,L)
-                if s.v4PlanLoaded then say('V4-serverstrategie voor '..character..' geladen.') end
+                db().v4ActiveSession=nil
+                ensureV4Identity('login')
             else plan=L.plan(db().planText,now()) end
             mailSignal();ui:Hide()
-        elseif e=='PLAYER_ENTERING_WORLD' then getBags();wallet()
+        elseif e=='PLAYER_ENTERING_WORLD' then
+            getBags();wallet()
+            if V4 then ensureV4Identity('world') end
         elseif e=='PLAYER_LOGOUT' then
-            if V4 then V4.logout(db(),now(),s.walletKnown and s.cash or nil,bags) end
+            if V4 then
+                ensureV4Identity('logout')
+                V4.logout(db(),now(),s.walletKnown and s.cash or nil,bags)
+            end
             recordCharacter('logout');s.loggingOut=true
         elseif e=='MAIL_SHOW' then s.mailOpen=true;s.mailKnown=false;s.ahOpen=false;if C_Timer and C_Timer.After then C_Timer.After(1,function() if s.mailOpen then check(function() mailbox();update() end) end end) end
         elseif e=='MAIL_INBOX_UPDATE' then mailbox()
@@ -404,6 +442,9 @@ local elapsed=0; frame:SetScript('OnUpdate',function(_,dt)
     elapsed=elapsed+dt
     if elapsed>=5 then
         elapsed=0
+        if V4 and not s.loggingOut and not db().v4ActiveSession then
+            check(function() ensureV4Identity('retry') end)
+        end
         if s.active then check(function() mailSignal();update();maybeAutoSearch() end) end
     end
 end)
@@ -415,7 +456,8 @@ button('Planning plakken',12,function() input:Show();input:SetFocus() end)
 button('Naar mailbox',150,function() s.bought=true;s.buyBlocked=true;lastCode=nil;check(update) end)
 button('Zoek volgend',288,function() check(searchNext) end)
 SLASH_FOREVERTRADER1='/ft';SlashCmdList.FOREVERTRADER=function(msg)
-    msg=msg:lower():match('^%s*(.-)%s*$');check(function()
+    local original=msg or ''
+    msg=original:lower():match('^%s*(.-)%s*$');check(function()
         if msg=='start' then s.active=true;ui:Show();mailSignal();getBags();lastCode=nil
         elseif msg=='auto on' then
             s.autoSearch=true;s.active=true;s.autoSearchCount=0
@@ -430,14 +472,42 @@ SLASH_FOREVERTRADER1='/ft';SlashCmdList.FOREVERTRADER=function(msg)
         elseif msg=='live off' then s.live=false;s.liveSpent=0;s.buyBlocked=true;say('Live test UIT. Geen aankopen zonder eigen bevestiging.')
         elseif msg=='live' then say('Live test '..(s.live and 'AAN' or 'UIT')..'. Gebruik /ft live on of /ft live off. Geen automatische orders.')
         elseif msg=='stop' then s.active=false;s.live=false;s.autoSearch=false;ui:Hide()
-        elseif msg=='market' then local f,r=market();if f~='Alliance' or r~='3' then say('Geen EU Alliance.');return end;db().pvpConfirmed=true;db().confirmedRealm=GetRealmName and GetRealmName() or nil;s.market=true;say('PvP door jou bevestigd; controleer dat dit de juiste realm is.')
+        elseif msg=='identity' then
+            local realm,character=identity()
+            local raw=GetRealmName and GetRealmName() or nil
+            say('Character: '..tostring(character or '(niet beschikbaar)')..
+                ' | Realm: '..tostring(realm or '(niet beschikbaar)')..
+                ' | GetRealmName: '..tostring(raw or '(nil)')..
+                ' | Export: '..(db().charactersWire and #db().charactersWire>7 and 'aanwezig' or 'leeg'))
+        elseif msg:match('^realm%s+') then
+            local chosen=original:match('^%s*%S+%s+(%S+)%s*$')
+            if not validIdentity(chosen) then say('Gebruik /ft realm Forever');return end
+            local automatic=GetRealmName and GetRealmName() or nil
+            if validIdentity(automatic) then
+                say('Client meldt realm '..automatic..'; handmatig instellen is niet nodig.')
+                return
+            end
+            db().realmOverride=chosen
+            if ensureV4Identity('manual-realm') then
+                say('Realm '..chosen..' ingesteld. Gebruik /reload om op te slaan.')
+            else
+                say('Realm ingesteld, maar characternaam ontbreekt nog. Probeer /reload.')
+            end
+        elseif msg=='market' then
+            local f,r=market();local realm=identity()
+            if f~='Alliance' or r~='3' or not realm then
+                say('Geen bevestigde EU Alliance realm. Gebruik /ft identity.');return
+            end
+            db().pvpConfirmed=true;db().confirmedRealm=realm;s.market=true
+            say('PvP door jou bevestigd voor realm '..realm..'.')
         elseif msg=='plan' then ui:Show();input:Show();input:SetFocus();say('Plak de FT3-planning uit het dashboard en druk Enter.')
         elseif msg=='bought' or msg=='mail' then s.bought=true;s.buyBlocked=true;targetBook={};lastCode=nil
         elseif msg=='search' then searchNext()
         elseif msg:match('^search %d+$') then searchNext(tonumber(msg:match('%d+')))
         elseif msg=='v4' then
             ui:Show()
-            local count=V4 and V4.actions(db(),GetRealmName and GetRealmName(),UnitName and UnitName('player'),function(action,id,qty)
+            local realm,character=identity()
+            local count=V4 and realm and character and V4.actions(db(),realm,character,function(action,id,qty)
                 local verb=action=='REVIEW_SELL' and 'Verkoop controleren' or
                            action=='VERIFY_BUY' and 'Koopkans controleren' or
                            action=='CHECK_LISTING' and 'Veiling controleren' or 'Vasthouden'
@@ -446,7 +516,7 @@ SLASH_FOREVERTRADER1='/ft';SlashCmdList.FOREVERTRADER=function(msg)
             if count==0 then say('Geen V4-adviezen beschikbaar voor dit character.') end
             lastCode=nil
         elseif msg=='status' or msg=='' then ui:Show();lastCode=nil
-        else say('/ft start | stop | v4 | auto on/off | live on/off | market | plan | bought | mail | search [itemID] | status');return end
+        else say('/ft start | stop | v4 | identity | realm Forever | auto on/off | live on/off | market | plan | bought | mail | search [itemID] | status');return end
         update()
     end)
 end
