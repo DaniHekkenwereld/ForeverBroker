@@ -25,8 +25,6 @@ CREATE TABLE IF NOT EXISTS character_snapshots(
     mail_ready INTEGER,
     mail_attachments INTEGER
 );
-"""
-PORTFOLIO_SCHEMA = """
 CREATE TABLE IF NOT EXISTS character_portfolio (
     character_key TEXT PRIMARY KEY,
     bank TEXT,bank_at INTEGER,bank_bound TEXT,
@@ -143,7 +141,6 @@ def parse_stock_wire(text,now,account):
 def store(db,rows):
     """Newer observed fields win independently; never erase offline characters."""
     import json
-    db.executescript(PORTFOLIO_SCHEMA)
     imported=0
     for r in rows:
         cur=db.execute('SELECT * FROM character_snapshots WHERE character_key=?',(r['character_key'],)).fetchone()
