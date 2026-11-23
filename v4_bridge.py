@@ -239,8 +239,12 @@ def api_request(base,token,endpoint,payload=None):
     try:
         with urllib.request.urlopen(req,timeout=15) as r:
             if r.status!=200:raise ValueError('VPS retourneerde geen HTTP 200')
-            blob=r.read(700000)
-            if len(blob)>=700000:raise ValueError('Serverantwoord te groot')
+            # Portfolio research can legitimately contain thousands of
+            # account-wide holdings; cap the response at 3 MiB instead of
+            # silently rejecting normal large inventories.
+            limit=3*1024*1024
+            blob=r.read(limit+1)
+            if len(blob)>limit:raise ValueError('Serverantwoord te groot (>3 MiB)')
             response=json.loads(blob)
         return response
     except urllib.error.HTTPError as exc:
