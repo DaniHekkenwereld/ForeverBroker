@@ -204,6 +204,27 @@ class BridgeTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,'last_seen'):
             v4_bridge.compatible_sessions(rows,[],now)
 
+    def test_legacy_http_400_preserves_character_sync_without_losing_sessions(self):
+        chars=[{'character_key':'account:eu-2-110:Warrior Pump'}]
+        old=[{'character_key':'account:eu-2-110:Warrior'}]
+        with patch.object(v4_bridge,'api_request',
+                          side_effect=[ValueError('VPS /api/v4/sync HTTP 400: Invalid sync data'),
+                                       {'ok':True}]) as request:
+            accepted=v4_bridge.send_sync('https://example.test','secret',chars,old)
+        self.assertEqual(accepted,0)
+        self.assertEqual(request.call_count,2)
+        self.assertEqual(request.call_args_list[0].args[3]['sessions'],old)
+        self.assertEqual(request.call_args_list[1].args[3]['sessions'],[])
+        self.assertEqual(old,[{'character_key':'account:eu-2-110:Warrior'}])
+
+    def test_character_only_upload_does_not_silently_succeed_if_rejected(self):
+        chars=[{'character_key':'account:eu-2-110:Warrior Pump'}]
+        with patch.object(v4_bridge,'api_request',
+                          side_effect=ValueError('VPS /api/v4/sync HTTP 400: Invalid sync data')) as request:
+            with self.assertRaisesRegex(ValueError,'HTTP 400'):
+                v4_bridge.send_sync('https://example.test','secret',chars,[])
+        self.assertEqual(request.call_count,1)
+
     def test_session_wire_parser(self):
         text='ForeverTraderDB = {\n ["sessionsWire"] = "FTSESSION1;Forever:Mage:100:1|Forever|Mage|100|200|1000|1500|2589:2|2589:10",\n}\n'
         rows=v4_bridge.parse_sessions(text,200,'account-a')
