@@ -10,6 +10,12 @@ local monitorPlan=logic.plan(longMonitor,now+21600)
 assert(monitorPlan and monitorPlan.rows[1].monitor,'24-hour read-only queue must survive 6 hours in WoW')
 local unsafePlan='FT3|eu-2-110|'..now..'|'..(now+86400)..';1111:100:1:200:0'
 assert(not logic.plan(unsafePlan,now),'24-hour actionable buy plan must be rejected')
+local oldMonitor='FT3|eu-2-110|'..now..'|'..(now+1800)..';1111:0:0:0:0'
+local oldPlan=logic.plan(oldMonitor,now+21600)
+assert(oldPlan and oldPlan.expires==now+86400,'legacy 30-min monitor queue should be searchable after 6 hours')
+local expiredBuy='FT3|eu-2-110|'..now..'|'..(now+1800)..';1111:100:1:200:0'
+assert(not logic.plan(expiredBuy,now+21600),'expired actionable buy plan must remain invalid')
+assert(not logic.plan(oldMonitor,now+86400),'queue must eventually expire after 24 hours')
 
 local p1='FT3|eu-2-110|1800000000|1800003600;1111:0:0:0:0'
 local p2='FT3|eu-2-110|1800000000|1800003600;2222:0:0:0:0'
