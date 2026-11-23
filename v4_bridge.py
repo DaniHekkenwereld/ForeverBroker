@@ -181,6 +181,18 @@ def api_request(base,token,endpoint,payload=None):
     return response
 
 
+def account_identity(path):
+    """Stable across Windows PCs using the same WoW account directory.
+
+    The parent directory of SavedVariables is the account folder; do not hash
+    the entire installation path (which changes between computers).
+    """
+    account=path.parent.parent.name
+    if not account or account in ('.','..'):
+        raise ValueError('Ongeldige WoW-accountmap')
+    return account
+
+
 def sync_once(prepared_only=False):
     c=trader.conf()
     path,message=legacy.saved_path(c)
@@ -190,7 +202,7 @@ def sync_once(prepared_only=False):
     token=secret()
     text=path.read_text(encoding='utf-8',errors='replace')
     now=int(time.time())
-    account=str(path.parent.parent)
+    account=account_identity(path)
     chars=characters.parse_saved_variables(text,now,account)
     sessions=parse_sessions(text,now,account)
     if chars or sessions:
