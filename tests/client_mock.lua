@@ -96,17 +96,24 @@ assert(ForeverTraderDB.browseSummary==clock..';2589:125:90;2592:200:50',ForeverT
 -- Explicit search is always read-only, even without an imported plan.
 SlashCmdList.FOREVERTRADER('search 2589')
 assert(C_AuctionHouse.lastSearched==2589)
+-- Missing server plan must explain why auto remains idle; no false success.
+SlashCmdList.FOREVERTRADER('auto on')
+assert(prints[#prints]:find('Geen geldige V4%-zoeklijst geladen'), 'auto must explain missing plan')
+SlashCmdList.FOREVERTRADER('auto off')
 -- Reconnect after the old search timeout with a valid desktop trading plan.
 clock=clock+40
 ForeverTraderDB.planText='FT3|eu-2-110|'..clock..'|'..(clock+900)..';2589:140:10:200:0'
 fire('PLAYER_LOGIN')
 SlashCmdList.FOREVERTRADER('start')
 fire('AUCTION_HOUSE_SHOW')
-SlashCmdList.FOREVERTRADER('auto on')
 local before=C_AuctionHouse.searchCount or 0
+SlashCmdList.FOREVERTRADER('auto on')
+assert(C_AuctionHouse.searchCount==before+1,'auto on should immediately start a search at open AH')
+SlashCmdList.FOREVERTRADER('auto status')
+assert(prints[#prints]:find('Wachten op AH-resultaten',1,true),'auto status must report pending results')
 clock=clock+6
 frames[1].scripts.OnUpdate(frames[1],5)
-assert(C_AuctionHouse.searchCount==before+1,'auto queue should send exactly one AH search')
+assert(C_AuctionHouse.searchCount==before+1,'pending search must not start a duplicate')
 fire('ITEM_SEARCH_RESULTS_UPDATED',{itemID=2589})
 local after=C_AuctionHouse.searchCount
 clock=clock+6
