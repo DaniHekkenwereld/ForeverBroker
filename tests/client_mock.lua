@@ -167,5 +167,15 @@ assert(ForeverTraderDB.characters['eu-2-110#Priest Falcon'],'world entry should 
 assert(ForeverTraderDB.v4ActiveSession,'world entry should start the delayed session')
 fire('PLAYER_LOGOUT')
 assert(ForeverTraderDB.sessionsWire:find('|eu-2-110|Priest Falcon|',1,true),'sessions must use full name')
+local investResult={}
+local investBlob={v4ActionsBlob='FT4!eu-2-110#Mage Pump?INVEST_SHORT:1111:1:15041:19000,INVEST_LONG:2222:1:15516:19600'}
+assert(ForeverTraderV4.actions(investBlob,'eu-2-110','Mage Pump',
+    function(kind,id,qty,maxBuy,target)
+        investResult[#investResult+1]={kind,id,qty,maxBuy,target}
+    end)==2,'both investment reviews must decode')
+assert(investResult[1][1]=='INVEST_SHORT' and investResult[1][4]==15041 and
+       investResult[1][5]==19000,'short investment entry and exit are preserved')
+assert(investResult[2][1]=='INVEST_LONG' and investResult[2][4]==15516,
+       'long investment scenario is preserved')
 for _,v in ipairs(prints)do assert(not v:match('Fout:'),v)end
 realprint('Lua client mock: auto AH search, wallet/mail and full first+surname identity OK')
