@@ -118,7 +118,7 @@ class PortfolioAdviceTests(unittest.TestCase):
         self.assertEqual(held[16203]['potentially_sellable'],0)
         self.assertEqual(held[14344]['potentially_sellable'],0)
         self.assertEqual(held[18832]['equipment'],1)
-        self.assertEqual(held[18832]['quoted_mark'],0)
+        self.assertIsNone(held[18832]['quoted_mark'])
         self.assertFalse(p['cost_basis_known'])
         self.assertIsNone(p['realized_profit'])
         html=v4_portfolio_ui.render(p,self.now)
