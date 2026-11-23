@@ -19,6 +19,7 @@ import legacy
 import trader
 import v4_engine as v4
 import v4_research
+import v4_trades
 
 MAX_BODY=300000
 UTC=dt.timezone.utc
@@ -26,7 +27,7 @@ UTC=dt.timezone.utc
 
 def open_db(path):
     db=trader.connect(pathlib.Path(path))
-    db.executescript(v4.SCHEMA)
+    db.executescript(v4.SCHEMA+v4_trades.SCHEMA)
     return db
 
 
@@ -188,10 +189,15 @@ class Handler(BaseHTTPRequestHandler):
             sessions=data.get('sessions')
             if type(sessions) is not list or len(sessions)>60:
                 raise ValueError('Bad sessions')
+            trades=data.get('trades',[])
+            if type(trades) is not list or len(trades)>250:
+                raise ValueError('Bad manual trade batch')
             # Validate all before committing anything. Client retries are
             # idempotent by character timestamps + session IDs.
             for ses in sessions:
                 v4.normalize_session(ses,now)
+            for trade in trades:
+                v4_trades.validate(trade,now)
             allowed={x['character_key'] for x in chars}
             # A session may refer to a previously recorded offline character;
             # matching a session to this private account is checked below.
@@ -203,10 +209,11 @@ class Handler(BaseHTTPRequestHandler):
                         raise ValueError('Unknown character')
                     count=characters.store(db,chars)
                     added=v4.store_sessions(db,sessions,now)
+                    trades_added=v4_trades.store(db,trades,now,allowed|old)
                     v4.strategy_list(db,now,self.server.cfg)
             finally:db.close()
             return self.respond(200,{'ok':True,'characters_updated':count,
-                                     'sessions_added':added})
+                                     'sessions_added':added,'trades_added':trades_added})
         except (ValueError,TypeError,OverflowError,sqlite3.Error):
             return self.respond(400,{'error':'Invalid sync data'})
 
