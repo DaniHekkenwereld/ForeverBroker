@@ -16,13 +16,23 @@ Het script compileert de Python-code, draait de regressietests en **stopt bij fo
 
 **Beveiliging:** dit maakt nog geen openbare verbinding. De API blijft op `127.0.0.1:8765`; voor de Windows-bridge moet er daarna eerst een werkende HTTPS-verbinding komen. De token nooit in GitHub of chat plakken.
 
-## ForeverTrader V4: server denkt, addon handelt wanneer je speelt
+## ForeverTrader V4: server onderzoekt, addon zoekt aan het AH
 
 De v4-server verzamelt onafhankelijk van WoW elk uur de openbare marktprijzen en bouwt historie op. Hij bewaart de laatst gesynchroniseerde gold, tassen, bekende veilingen en afgesloten sessies **per character**, en berekent telkens nieuwe onderzoeks- en handelsadviezen op basis van historische prijsdata en beschikbare gold. De Windows-bridge verstuurt sessiegegevens na uitloggen en zet een korte `FT3`-controleplanning en adviezen per character klaar voordat WoW opnieuw start.
 
 **V4 starten:** na de eenmalige VPS-/Windows-koppeling installeert `INSTALL-V4-BRIDGE.bat` de automatische Windows-bridge. Sluit WoW na de eerste koppeling volledig af zodat de bridge de serverzoeklijst kan klaarzetten. Daarna volstaat in-game: AH openen en `/ft auto on` (alleen zoeken); `/ft auto status` vertelt waarom zoeken eventueel pauzeert. Geen handmatige FT3-planning meer plakken. De read-only zoeklijst blijft maximaal 24 uur bruikbaar, ook tijdens lange WoW-sessies. Voor een **live desktopoverzicht** start je `DASHBOARD-V4.bat`: dit haalt elke 30 seconden rechtstreeks de nieuwste strategieën op van de VPS, zonder WoW te wijzigen.
 
 **Belangrijk:** draai op de VPS `v4_server.py` en NIET daarnaast `START.bat` voor dezelfde database. De addon kan geen internetverbinding openen; de bridge kan een serverplan pas veilig in SavedVariables zetten **nadat WoW volledig is afgesloten**. In één al lopende gamesessie komt geen nieuwe serverplanning binnen. Geen automatische koop- of verkoopacties. Geen geverifieerde GPH zolang we geen echte transactiekosten en verkoopresultaten hebben.
+
+### Market Desk: zichtbare kansen en AH-zoeklog
+
+Start op je Windows-pc **`DASHBOARD-V4.bat`**. Dit start lokaal een browserdashboard dat iedere 30 seconden de VPS bevraagt via het beveiligde `/api/v4/research` endpoint; de onderliggende bron publiceert doorgaans maar één marktsnapshot per uur.
+
+Je ziet er de echte TK-vraagprijzen, 14-daagse vraagprijshistorie indien geïmporteerd, **als verkoop gemelde** bedragen en geschatte/waar beschikbaar bevestigde volumes. Het dashboard toont een conservatieve **referentie-uitstapprijs, maximale theoretische koopprijs en potentieel verschil vóór deposit** uitsluitend waar daarvoor gegevens zijn. Zo'n marge is nooit gegarandeerde winst; een externe vraagprijs is geen verkoop. Vendor flips worden **niet** berekend: de Forever-vendorprijs is nog niet in de game gevalideerd.
+
+Verder bevat het de **exacte 20 (of minder) zoekitems per character**, op volgorde, plus de echte zoekopdrachten en laagste in-game AH-prijzen uit de opgeslagen addon-export. De nieuwe addon zegt bij elke zoekopdracht en ieder volledig ontvangen resultaat ook in WoW wat hij doet. Typ `/ft auto status` voor de huidige sessie.
+
+**Beperking:** WoW schrijft SavedVariables alleen bij uitloggen of `/reload`. Het dashboard kan die in-game prijzen dus pas daarna uitlezen en toont nadrukkelijk hoe oud ze zijn. Het leest geen geheugen en koopt of verkoopt niets automatisch.
 
 [Volledige V4-handleiding, serverinstallatie, Windows-configuratie en beperkingen](docs/FOREVERTRADER-V4.md).
 
