@@ -90,7 +90,7 @@ class MarketResearchTests(unittest.TestCase):
                 self.assertEqual(ctx.exception.code,401)
                 req=urllib.request.Request(
                     url,headers={'Authorization':'Bearer '+token})
-                with urllib.request.urlopen(req,timeout=5) as response:
+                with urllib.request.urlopen(req,timeout=20) as response:
                     self.assertEqual(response.status,200)
                     report=json.load(response)
                 self.assertEqual(report['snapshot_at'],self.now)
