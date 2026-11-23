@@ -12,6 +12,8 @@ import trader
 import characters
 import v4_engine
 import v4_investing
+import v4_portfolio
+import v4_daily_radar
 
 MARKET = 'eu-2-110'
 RESEARCH_LIMIT = 120
@@ -39,10 +41,13 @@ def build(db, clock, cfg):
         'opportunities':[], 'lookup':{},'budget_copper':None,'budget_character':None,
         'investments':[],'shortlist_count':0,'rising_count':0,'falling_count':0,
         'basket_change_7d_pct':None,'basket_item_count':0,
+        'portfolio':None,'intraday':None,
         'last_attempt':trader.getmeta(db,'market_attempt',0) or None,
         'last_error':trader.getmeta(db,'market_last_error','') or None,
     }
     if not row:
+        result['portfolio']=v4_portfolio.build(db,{},0,clock,cfg,[])
+        result['intraday']=v4_daily_radar.build(db,{},0,clock,cfg,[])
         return result
     age=clock-int(row['t'])
     market={int(i):v for i,v in json.loads(row['payload']).items()}
@@ -53,6 +58,12 @@ def build(db, clock, cfg):
     # The investment radar works on all affordable and unaffordable items.
     # Capital budgeting is presented separately; it never hides market trends.
     result.update(v4_investing.analyze(db,market,int(row['t']),cfg,clock))
+    result['portfolio']=v4_portfolio.build(db,market,int(row['t']),clock,cfg,
+                                           result.get('investments') or [])
+    result['intraday']=v4_daily_radar.build(
+        db,market,int(row['t']),clock,cfg,
+        result.get('investments') or [],
+        [r['id'] for r in result['portfolio'].get('holdings') or []])
     funding=0
     for char in characters.read_all(db):
         wallet=char.get('gold')
