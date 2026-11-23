@@ -10,6 +10,7 @@ import datetime as dt
 
 import characters
 import v4_investing
+import v4_trades
 
 MARKET='eu-2-110'
 
@@ -70,6 +71,8 @@ def build(db,market,market_t,clock,cfg,investments=None):
     by_invest={i['id']:i for i in investments}
     source_fresh=fresh(market_t,clock,90*60)
     chars=characters.read_all(db)
+    journal=v4_trades.summarize(db)
+    char_names={c['character_key']:c['character'] for c in chars}
     char_rows=[]
     holdings={}
     gold_total=0
@@ -171,7 +174,16 @@ def build(db,market,market_t,clock,cfg,investments=None):
         elif item in by_invest and by_invest[item].get('trend') in ('STIJGT','STIJGT SNEL'):
             advice='AANHOUDEN / MOMENTUM CONTROLEREN'
         else:advice='AANHOUDEN / PRIJS CONTROLEREN'
+        purchase=journal['positions'].get(item,{})
+        purchased_qty=purchase.get('known_units',0)
+        purchased_cost=purchase.get('known_cost')
+        if purchased_qty and purchased_qty>raw:
+            # A transfer / sale may not have been manually recorded.
+            # Don't report basis as matching observed current inventory.
+            purchased_cost=None
         rows.append({**row,'id':item,
+                     'recorded_purchase_units':purchased_qty,
+                     'recorded_purchase_cost':purchased_cost,
                      'name':x.get('name') or f'Item {item}',
                      'category':x.get('cls') or 'Onbekend',
                      'total':raw,'potentially_sellable':available,
@@ -228,6 +240,10 @@ def build(db,market,market_t,clock,cfg,investments=None):
                       'status':('BEVESTIGDE RAID-DATUM, PRIJSIMPACT ONBEWEZEN'
                                 if days_to_raid>=0 else
                                 'RAIDS AL OPEN, NIEUWE TIERDATUM ONBEKEND')})
+    annotated=[]
+    for record in journal['recent_trades']:
+        annotated.append({**record,
+                          'character':char_names.get(record['character_key'],'Onbekend')})
     return {
         'characters':char_rows,'gold_total_last_known':gold_total,
         'gold_recent_7d':gold_recent,'wallet_count':known_wallets,
@@ -240,7 +256,13 @@ def build(db,market,market_t,clock,cfg,investments=None):
             'voor potentieel verkoopbare items. Geen gerealiseerde waarde, '
             'geen kostprijs of bewezen winst.'),
         'buy_review':buy,'themes':ideas,
-        'realized_profit':None,'cost_basis_known':False,
+        'realized_profit':(journal['reported_realized_net']
+                            if journal['reported_realized_known'] else None),
+        'cost_basis_known':bool(journal['positions']),
+        'trade_count':journal['trade_count'],
+        'unmatched_sales':journal['unmatched_sales'],
+        'trades':annotated,
+        'basis_source':journal['basis_source'],
         'note':'Gebonden/uitgeruste items niet als verkoopbaar gewaardeerd. '
                'De bank wordt alleen opnieuw gemeten bij openen. '
                'Per-character gold kan niet vanzelf worden samengevoegd.',
