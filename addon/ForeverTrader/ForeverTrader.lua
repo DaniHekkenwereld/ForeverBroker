@@ -7,28 +7,24 @@ local function say(s) print('|cffe4ba63ForeverTrader:|r '..s) end
 local function now() return GetServerTime and GetServerTime() or time() end
 local function db() if type(ForeverTraderDB)~='table' then ForeverTraderDB={} end; ForeverTraderDB.schema='FT1';return ForeverTraderDB end
 local function market() return UnitFactionGroup('player') or 'Unknown',tostring(GetCurrentRegion and GetCurrentRegion() or 0) end
--- The private-server client may return an empty realm until fully loaded.
+-- This Forever client no longer exposes reliable realm names. The trading
+-- profile is fixed to the public EU PvP Alliance market, NOT to the player
+-- realm reported by GetRealmName/GetNormalizedRealmName/GetCVar.
+local MARKET_ID='eu-2-110'
 local function validIdentity(v)
     return type(v)=='string' and #v>0 and #v<=100 and not v:find('[|;#?"\\%c]')
 end
 local function identity()
     local character=UnitName and UnitName('player') or nil
-    local realm=GetRealmName and GetRealmName() or nil
-    if UnitFullName then
-        local n,r=UnitFullName('player')
-        if not validIdentity(character) and validIdentity(n) then character=n end
-        if not validIdentity(realm) and validIdentity(r) then realm=r end
+    if not validIdentity(character) and UnitFullName then
+        character=UnitFullName('player')
     end
-    if not validIdentity(realm) and GetNormalizedRealmName then realm=GetNormalizedRealmName() end
-    if not validIdentity(realm) and GetCVar then realm=GetCVar('realmName') end
-    if not validIdentity(realm) then realm=db().realmOverride end
-    if not validIdentity(realm) or not validIdentity(character) then return nil,nil end
-    return realm,character
+    if not validIdentity(character) then return nil,nil end
+    return MARKET_ID,character
 end
 local function realmOK()
-    local f,r=market();local realm=identity()
-    return f=='Alliance' and r=='3' and db().pvpConfirmed==true and
-           realm~=nil and db().confirmedRealm==realm
+    local faction,region=market()
+    return faction=='Alliance' and region=='3'
 end
 local s={active=false,mailOpen=false,ahOpen=false,mailKnown=false,ready=0,pending=0,attachments=0,partial=false,cash=0,reserve=150000,threshold=20000,buyCount=0,sellCount=0,mailAlert=false,bought=false,live=false,liveSpent=0,walletKnown=false,autoSearch=false,autoSearchCount=0}
 local plan,book,bags,buys,sells=nil,{},{},{},{}
@@ -103,6 +99,16 @@ recordCharacter=function(reason)
     if type(d.characters)~='table' then d.characters={} end
     local key=realm..'#'..character
     local rec=d.characters[key]
+    -- Migrate an existing observation for this character from the incorrect
+    -- old realm labels (e.g. a client CVar / a manual override) without
+    -- losing wallet, auction, mail or bag history.
+    for oldKey,old in pairs(d.characters) do
+        if oldKey~=key and type(old)=='table' and old.name==character and
+           old.faction=='Alliance' then
+            if type(rec)~='table' or (old.lastSeen or 0)>(rec.lastSeen or 0) then rec=old end
+            d.characters[oldKey]=nil
+        end
+    end
     if type(rec)~='table' then rec={name=character,realm=realm} end
     rec.name=character;rec.realm=realm;rec.faction=(UnitFactionGroup and UnitFactionGroup('player')) or 'Unknown'
     rec.lastSeen=now();rec.lastUpdate=reason
@@ -407,6 +413,7 @@ frame:SetScript('OnEvent',function(_,e,...)
             getBags();wallet()
             plan=nil
             if V4 then
+                db().realmOverride=nil  -- Remove the obsolete manual realm override.
                 db().v4ActiveSession=nil
                 ensureV4Identity('login')
             else plan=L.plan(db().planText,now()) end
@@ -472,34 +479,14 @@ SLASH_FOREVERTRADER1='/ft';SlashCmdList.FOREVERTRADER=function(msg)
         elseif msg=='live off' then s.live=false;s.liveSpent=0;s.buyBlocked=true;say('Live test UIT. Geen aankopen zonder eigen bevestiging.')
         elseif msg=='live' then say('Live test '..(s.live and 'AAN' or 'UIT')..'. Gebruik /ft live on of /ft live off. Geen automatische orders.')
         elseif msg=='stop' then s.active=false;s.live=false;s.autoSearch=false;ui:Hide()
-        elseif msg=='identity' then
+        elseif msg=='identity' or msg=='market' then
             local realm,character=identity()
-            local raw=GetRealmName and GetRealmName() or nil
+            local faction,region=market()
             say('Character: '..tostring(character or '(niet beschikbaar)')..
-                ' | Realm: '..tostring(realm or '(niet beschikbaar)')..
-                ' | GetRealmName: '..tostring(raw or '(nil)')..
+                ' | Markt: Forever EU PvP Alliance ('..MARKET_ID..')'..
+                ' | Faction: '..faction..' | Region: '..region..
                 ' | Export: '..(db().charactersWire and #db().charactersWire>7 and 'aanwezig' or 'leeg'))
-        elseif msg:match('^realm%s+') then
-            local chosen=original:match('^%s*%S+%s+(%S+)%s*$')
-            if not validIdentity(chosen) then say('Gebruik /ft realm Forever');return end
-            local automatic=GetRealmName and GetRealmName() or nil
-            if validIdentity(automatic) then
-                say('Client meldt realm '..automatic..'; handmatig instellen is niet nodig.')
-                return
-            end
-            db().realmOverride=chosen
-            if ensureV4Identity('manual-realm') then
-                say('Realm '..chosen..' ingesteld. Gebruik /reload om op te slaan.')
-            else
-                say('Realm ingesteld, maar characternaam ontbreekt nog. Probeer /reload.')
-            end
-        elseif msg=='market' then
-            local f,r=market();local realm=identity()
-            if f~='Alliance' or r~='3' or not realm then
-                say('Geen bevestigde EU Alliance realm. Gebruik /ft identity.');return
-            end
-            db().pvpConfirmed=true;db().confirmedRealm=realm;s.market=true
-            say('PvP door jou bevestigd voor realm '..realm..'.')
+            if not realmOK() then say('Waarschuwing: deze client is geen EU Alliance. Geen live AH-adviezen.') end
         elseif msg=='plan' then ui:Show();input:Show();input:SetFocus();say('Plak de FT3-planning uit het dashboard en druk Enter.')
         elseif msg=='bought' or msg=='mail' then s.bought=true;s.buyBlocked=true;targetBook={};lastCode=nil
         elseif msg=='search' then searchNext()
@@ -516,7 +503,7 @@ SLASH_FOREVERTRADER1='/ft';SlashCmdList.FOREVERTRADER=function(msg)
             if count==0 then say('Geen V4-adviezen beschikbaar voor dit character.') end
             lastCode=nil
         elseif msg=='status' or msg=='' then ui:Show();lastCode=nil
-        else say('/ft start | stop | v4 | identity | realm Forever | auto on/off | live on/off | market | plan | bought | mail | search [itemID] | status');return end
+        else say('/ft start | stop | v4 | identity | market | auto on/off | live on/off | plan | bought | mail | search [itemID] | status');return end
         update()
     end)
 end
