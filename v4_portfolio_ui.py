@@ -121,8 +121,12 @@ def render(report,now,filters=None):
                      cell(e(g(idea.get('ask'))),'num')+
                      cell(e(idea.get('volume_24h')),'num')+
                      cell(str(idea.get('owned',0)),'num')+
-                     cell(e(idea.get('thesis'))+'<small class="sub">'+e(idea.get('status'))+'</small>','reason')+'</tr>')
-    theme_table=table(['Item','Mogelijke katalysator','TK-vraagprijs','Volume','Eigen stuks','Reden + onzekerheid'],
+                     cell(e(idea.get('event_date'))+'<small class="sub">'+
+                          e(idea.get('days_to_event'))+' dagen tot datum</small>')+
+                     cell(e(idea.get('thesis'))+'<small class="sub">'+e(idea.get('status'))+
+                          ' · <a href="'+e(idea.get('event_source'))+
+                          '" target="_blank" rel="noopener noreferrer">Officiële raidkalender</a></small>','reason')+'</tr>')
+    theme_table=table(['Item','Mogelijke katalysator','TK-vraagprijs','Volume','Eigen stuks','Raidmijlpaal','Reden + onzekerheid'],
                       themes,'Geen thematische watchlist.')
     return ('<div class="sectionhead"><div><h2>Jouw totale portfolio</h2>'
             '<p>Gold + ALLE bekende items, afzonderlijk per tas, bank, eigen AH en equipment.</p></div>'
