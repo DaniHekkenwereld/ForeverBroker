@@ -45,11 +45,13 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self.send_error(404)
             return
         args=urllib.parse.parse_qs(url.query,keep_blank_values=True)
-        filters={key:args.get(key,[''])[0][:70] for key in ('q','sort','mode')}
-        if filters['sort'] not in ('signal','discount','net','volume','name'):
+        filters={key:args.get(key,[''])[0][:70] for key in ('q','sort','mode','focus')}
+        if filters['sort'] not in ('signal','discount','net','volume','name','momentum24','momentum7'):
             filters['sort']='signal'
         if filters['mode'] not in ('all','budget','interesting','history'):
             filters['mode']='all'
+        if filters['focus'] not in ('all','short','long','rising','falling','dips','budget'):
+            filters['focus']='all'
         try:
             body=render_current(self.server.base,self.server.token,filters=filters)
             status=200
