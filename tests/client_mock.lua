@@ -109,12 +109,19 @@ fire('AUCTION_HOUSE_SHOW')
 local before=C_AuctionHouse.searchCount or 0
 SlashCmdList.FOREVERTRADER('auto on')
 assert(C_AuctionHouse.searchCount==before+1,'auto on should immediately start a search at open AH')
+assert(ForeverTraderDB.v4SearchLog and ForeverTraderDB.v4SearchLog:find(':Q:2589:',1,true),
+       'auto queries must be persisted with item ID for the dashboard')
 SlashCmdList.FOREVERTRADER('auto status')
 assert(prints[#prints]:find('Wachten op AH-resultaten',1,true),'auto status must report pending results')
 clock=clock+6
 frames[1].scripts.OnUpdate(frames[1],5)
 assert(C_AuctionHouse.searchCount==before+1,'pending search must not start a duplicate')
 fire('ITEM_SEARCH_RESULTS_UPDATED',{itemID=2589})
+assert(ForeverTraderDB.v4SearchLog:find(':R:2589:100:1',1,true),
+       'completed AH response must save actual copper/item and price rows')
+SlashCmdList.FOREVERTRADER('auto status')
+assert(prints[#prints-1]:find('Laatste AH-resultaat',1,true),
+       'auto status must show last real AH result')
 local after=C_AuctionHouse.searchCount
 clock=clock+6
 frames[1].scripts.OnUpdate(frames[1],5)
