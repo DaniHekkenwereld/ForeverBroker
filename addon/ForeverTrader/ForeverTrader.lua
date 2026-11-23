@@ -573,11 +573,19 @@ SLASH_FOREVERTRADER1='/ft';SlashCmdList.FOREVERTRADER=function(msg)
         elseif msg=='v4' then
             ui:Show()
             local realm,character=identity()
-            local count=V4 and realm and character and V4.actions(db(),realm,character,function(action,id,qty)
-                local verb=action=='REVIEW_SELL' and 'Verkoop controleren' or
-                           action=='VERIFY_BUY' and 'Koopkans controleren' or
-                           action=='CHECK_LISTING' and 'Veiling controleren' or 'Vasthouden'
-                say(verb..': '..name(id)..' x'..qty)
+            local count=V4 and realm and character and V4.actions(db(),realm,character,function(action,id,qty,maxBuy,target)
+                if action=='INVEST_SHORT' or action=='INVEST_LONG' then
+                    local horizon=action=='INVEST_SHORT' and 'KORT (1-5 dagen)' or 'LANG (1-3 weken)'
+                    say('INVESTEREN '..horizon..': '..name(id)..
+                        ' | max instap '..(maxBuy and gold(maxBuy) or 'onbekend')..
+                        ' | verkoopscenario '..(target and gold(target) or 'onbekend')..
+                        ' | zelf AH en verkoopsnelheid controleren!')
+                else
+                    local verb=action=='REVIEW_SELL' and 'Verkoop controleren' or
+                               action=='VERIFY_BUY' and 'Koopkans controleren' or
+                               action=='CHECK_LISTING' and 'Veiling controleren' or 'Volgen'
+                    say(verb..': '..name(id)..' x'..qty)
+                end
             end) or 0
             if count==0 then say('Geen V4-adviezen beschikbaar voor dit character.') end
             lastCode=nil
