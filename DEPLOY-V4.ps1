@@ -10,7 +10,7 @@ if (-not (Get-Command ssh.exe -ErrorAction SilentlyContinue)) {
     throw 'Windows OpenSSH ontbreekt.'
 }
 Write-Host 'ForeverTrader V4 VPS bijwerken. SSH kan om het VPS- en sudo-wachtwoord vragen.' -ForegroundColor Cyan
-$remoteCommand='set -e; cd ~/ForeverBroker; git pull --ff-only; python3 -m compileall -q v4_server.py v4_investing.py v4_investing_ui.py v4_research.py v4_dashboard.py v4_engine.py v4_dashboard_live.py; python3 -m unittest discover -s tests -q; sudo systemctl restart forevertrader-v4; sudo systemctl is-active --quiet forevertrader-v4; echo FOREVERTRADER_V4_DEPLOY_OK'
+$remoteCommand='set -e; cd ~/ForeverBroker; git pull --ff-only; python3 -m compileall -q v4_server.py v4_investing.py v4_investing_ui.py v4_research.py v4_dashboard.py v4_engine.py v4_dashboard_live.py v4_portfolio.py v4_portfolio_ui.py v4_trades.py v4_daily_radar.py v4_daily_ui.py characters.py v4_bridge.py; python3 -m unittest discover -s tests -q; sudo systemctl restart forevertrader-v4; sudo systemctl is-active --quiet forevertrader-v4; echo FOREVERTRADER_V4_DEPLOY_OK'
 & ssh.exe -tt -o 'PubkeyAuthentication=no' -o "UserKnownHostsFile=$knownHosts" "hekkenwereld@$hostIp" $remoteCommand
 if ($LASTEXITCODE -ne 0) {
     throw 'VPS-update mislukt. Bij falende tests is de VPS-service NIET opnieuw gestart.'
@@ -24,8 +24,8 @@ $research=Invoke-RestMethod -Uri "https://$hostIp/api/v4/research" -Headers @{Au
 if ($research.version -ne '4.0.0' -or $research.market -ne 'eu-2-110') {
     throw 'De VPS gaf niet de verwachte marktanalyse.'
 }
-if ($null -eq $research.investments) {
-    throw 'VPS retourneert geen investeringsanalyse. Controleer de service.'
+if ($null -eq $research.investments -or $null -eq $research.portfolio -or $null -eq $research.intraday) {
+    throw 'VPS retourneert niet alle V1-beta modules (investeringen, portfolio, daghandel).'
 }
 Write-Host "VPS werkt. Items onderzocht: $($research.analyzed_count). Investeringssignalen: $($research.shortlist_count)." -ForegroundColor Green
 if ($research.market_fresh -ne $true) {
