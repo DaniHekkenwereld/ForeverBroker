@@ -217,6 +217,30 @@ def api_request(base,token,endpoint,payload=None):
                          (': '+detail if detail else '')) from None
 
 
+def send_sync(base,token,chars,sessions):
+    """Upload character observations even if a legacy session batch is rejected.
+
+    Return the number of sessions actually accepted for the summary. The
+    original SavedVariables file is never altered or pruned by this method.
+    """
+    if not chars and not sessions:return 0
+    payload={'schema':'FT4SYNC1','characters':chars,'sessions':sessions}
+    try:
+        response=api_request(base,token,'/api/v4/sync',payload)
+    except ValueError as exc:
+        if chars and sessions and '/api/v4/sync HTTP 400' in str(exc):
+            response=api_request(base,token,'/api/v4/sync',
+                                 {'schema':'FT4SYNC1','characters':chars,'sessions':[]})
+            print('V4: sessiebatch geweigerd; charactergegevens apart gesynchroniseerd. '
+                  'Originele sessies blijven bewaard.',flush=True)
+            sessions=[]
+        else:
+            raise
+    if response.get('ok') is not True:
+        raise ValueError('Server bevestigde sync niet')
+    return len(sessions)
+
+
 def account_identity(path):
     """Stable across Windows PCs using the same WoW account directory.
 
@@ -244,24 +268,7 @@ def sync_once(prepared_only=False):
     sessions,skipped=compatible_sessions(chars,sessions,now)
     if skipped:
         print('V4: '+str(skipped)+' oude sessie(s) met afwijkende naam/markt overgeslagen; origineel bewaard.',flush=True)
-    if chars or sessions:
-        payload={'schema':'FT4SYNC1','characters':chars,'sessions':sessions}
-        try:
-            response=api_request(base,token,'/api/v4/sync',payload)
-        except ValueError as exc:
-            # If a legacy session slips through and the VPS rejects this
-            # atomic batch, try a CHARACTER-ONLY upload once. The client
-            # must never sacrifice correct current gold/bags/auctions because
-            # of a previous addon build's bad session identity.
-            if chars and sessions and '/api/v4/sync HTTP 400' in str(exc):
-                response=api_request(base,token,'/api/v4/sync',
-                                     {'schema':'FT4SYNC1','characters':chars,'sessions':[]})
-                print('V4: sessiebatch geweigerd; charactergegevens apart gesynchroniseerd. '
-                      'De originele sessies blijven bewaard.',flush=True)
-                sessions=[]
-            else:
-                raise
-        if response.get('ok') is not True:raise ValueError('Server bevestigde sync niet')
+    uploaded_sessions=send_sync(base,token,chars,sessions)
     strategy=api_request(base,token,'/api/v4/strategies')
     if strategy.get('version')!='4.0.0' or strategy.get('market')!='eu-2-110':
         raise ValueError('Verkeerde V4 server/markt')
@@ -269,7 +276,7 @@ def sync_once(prepared_only=False):
     if not isinstance(plans,list):raise ValueError('Ongeldig serverantwoord')
     dashboard=v4_dashboard.write(trader.ROOT/'data'/'v4'/'dashboard.html',plans,now)
     result=write_plans(path,text,plans) if not prepared_only else 'Sessies naar VPS gestuurd'
-    return f'Verstuurd: {len(chars)} characters, {len(sessions)} sessies. {result} | Dashboard: {dashboard}'
+    return f'Verstuurd: {len(chars)} characters, {uploaded_sessions} sessies. {result} | Dashboard: {dashboard}'
 
 
 def main():
