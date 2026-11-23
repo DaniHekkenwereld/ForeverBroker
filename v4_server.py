@@ -44,7 +44,8 @@ def validate_characters(rows,now):
                 raise ValueError('Invalid name')
         last=x.get('last_seen')
         if type(last) is not int or not 0<last<=now+300:raise ValueError('Invalid last_seen')
-        for at in ('wallet_at','bags_at','auctions_at','mail_at'):
+        for at in ('wallet_at','bags_at','auctions_at','mail_at',
+                   'bank_at','bag_bound_at','equipment_at'):
             t=x.get(at)
             if t is not None and (type(t) is not int or not 0<t<=now+300):
                 raise ValueError('Invalid timestamp')
@@ -52,7 +53,8 @@ def validate_characters(rows,now):
             n=x.get(keyname)
             if n is not None and (type(n) is not int or not 0<=n<=9007199254740991):
                 raise ValueError('Invalid amount')
-        for keyname in ('bags','auctions'):
+        for keyname in ('bags','auctions','bank','bank_bound',
+                        'bag_bound','equipment'):
             values=x.get(keyname)
             if values is not None:
                 if type(values) is not dict or len(values)>2000:
@@ -60,6 +62,16 @@ def validate_characters(rows,now):
                 for item,qty in values.items():
                     if not str(item).isdigit() or type(qty) is not int or not 0<qty<=10000000:
                         raise ValueError('Invalid inventory quantity')
+        for group,when in (('bank','bank_at'),('bag_bound','bag_bound_at'),
+                           ('equipment','equipment_at')):
+            if x.get(group) is not None and x.get(when) is None:
+                raise ValueError('Portfolio location lacks timestamp')
+        if x.get('bank_bound') is not None and x.get('bank_at') is None:
+            raise ValueError('Bound bank lacks timestamp')
+        for location,bound in (('bank','bank_bound'),('bags','bag_bound')):
+            if isinstance(x.get(bound),dict) and isinstance(x.get(location),dict):
+                if any(q>x[location].get(i,0) for i,q in x[bound].items()):
+                    raise ValueError('Bound items exceed actual inventory')
         good.append(x)
     return good
 
