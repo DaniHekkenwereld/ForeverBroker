@@ -160,6 +160,12 @@ class BridgeTests(unittest.TestCase):
         source='ForeverTraderDB = {\n  ["sessionsWire"] = "FTSESSION1;'+orphan+'",\n}\n'
         self.assertEqual(v4_bridge.parse_sessions(source,200,'account-a'),[])
 
+    def test_account_identity_is_portable_between_windows_install_paths(self):
+        a=pathlib.PureWindowsPath(r'C:\\Games\\WoW\\_forever_\\WTF\\Account\\ACCOUNT#1\\SavedVariables\\ForeverTrader.lua')
+        b=pathlib.PureWindowsPath(r'D:\\World of Warcraft\\_forever_\\WTF\\Account\\ACCOUNT#1\\SavedVariables\\ForeverTrader.lua')
+        self.assertEqual(v4_bridge.account_identity(a),'ACCOUNT#1')
+        self.assertEqual(v4_bridge.account_identity(a),v4_bridge.account_identity(b))
+
     def test_session_wire_parser(self):
         text='ForeverTraderDB = {\n ["sessionsWire"] = "FTSESSION1;Forever:Mage:100:1|Forever|Mage|100|200|1000|1500|2589:2|2589:10",\n}\n'
         rows=v4_bridge.parse_sessions(text,200,'account-a')
