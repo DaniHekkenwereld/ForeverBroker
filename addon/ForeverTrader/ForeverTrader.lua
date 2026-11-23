@@ -7,19 +7,36 @@ local function say(s) print('|cffe4ba63ForeverTrader:|r '..s) end
 local function now() return GetServerTime and GetServerTime() or time() end
 local function db() if type(ForeverTraderDB)~='table' then ForeverTraderDB={} end; ForeverTraderDB.schema='FT1';return ForeverTraderDB end
 local function market() return UnitFactionGroup('player') or 'Unknown',tostring(GetCurrentRegion and GetCurrentRegion() or 0) end
--- This Forever client no longer exposes reliable realm names. The trading
--- profile is fixed to the public EU PvP Alliance market, NOT to the player
--- realm reported by GetRealmName/GetNormalizedRealmName/GetCVar.
+-- Forever's character identity is FIRST NAME + SURNAME, unique per
+-- region. UnitName/UnitFullName return surname as their *second* value,
+-- NOT a realm. GetUnitName("player") returns the joined full name.
+-- The market ID is independent of character identity and is fixed for
+-- this EU PvP Alliance addon.
 local MARKET_ID='eu-2-110'
 local function validIdentity(v)
     return type(v)=='string' and #v>0 and #v<=100 and not v:find('[|;#?"\\%c]')
 end
-local function identity()
-    local character=UnitName and UnitName('player') or nil
-    if not validIdentity(character) and UnitFullName then
-        character=UnitFullName('player')
+local function characterName()
+    -- Prefer the native full-name function. Never identify a Forever
+    -- character only by its first name: first names are NOT unique.
+    if GetUnitName then
+        local full=GetUnitName('player',true)
+        if validIdentity(full) and full:find('%S+%s+%S+') then return full end
     end
-    if not validIdentity(character) then return nil,nil end
+    local first,surname
+    if UnitName then first,surname=UnitName('player') end
+    if (not validIdentity(first) or not validIdentity(surname)) and UnitFullName then
+        local a,b=UnitFullName('player')
+        if not validIdentity(first) then first=a end
+        if not validIdentity(surname) then surname=b end
+    end
+    if not validIdentity(first) or not validIdentity(surname) then return nil end
+    local full=first..(CHARACTERNAME_SURNAME_SEPARATOR or ' ')..surname
+    return validIdentity(full) and full or nil
+end
+local function identity()
+    local character=characterName()
+    if not character then return nil,nil end
     return MARKET_ID,character
 end
 local function realmOK()
@@ -99,12 +116,13 @@ recordCharacter=function(reason)
     if type(d.characters)~='table' then d.characters={} end
     local key=realm..'#'..character
     local rec=d.characters[key]
-    -- Migrate an existing observation for this character from the incorrect
-    -- old realm labels (e.g. a client CVar / a manual override) without
-    -- losing wallet, auction, mail or bag history.
+    -- Migrate old snapshots only when an exact name OR player GUID matches.
+    -- A first name on its own is ambiguous on Forever, so never merge two
+    -- different characters merely because they share the first name.
+    local guid=UnitGUID and UnitGUID('player') or nil
     for oldKey,old in pairs(d.characters) do
-        if oldKey~=key and type(old)=='table' and old.name==character and
-           old.faction=='Alliance' then
+        if oldKey~=key and type(old)=='table' and old.faction=='Alliance' and
+           (old.name==character or (guid and old.guid and old.guid==guid)) then
             if type(rec)~='table' or (old.lastSeen or 0)>(rec.lastSeen or 0) then rec=old end
             d.characters[oldKey]=nil
         end
