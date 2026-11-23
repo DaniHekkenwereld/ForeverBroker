@@ -63,6 +63,10 @@ local function owned()
     if recordCharacter then recordCharacter('owned') end
 end
 local function gold(n) return string.format('%.2fg',(n or 0)/10000) end
+local function goldExact(n)
+    n=math.max(0,math.floor(n or 0))
+    return math.floor(n/10000)..'g '..math.floor(n%10000/100)..'s '..(n%100)..'c'
+end
 local function wallet()
     local f,r=market();local money=GetMoney()
     if type(money)~='number' or money<0 then return end
@@ -577,8 +581,8 @@ SLASH_FOREVERTRADER1='/ft';SlashCmdList.FOREVERTRADER=function(msg)
                 if action=='INVEST_SHORT' or action=='INVEST_LONG' then
                     local horizon=action=='INVEST_SHORT' and 'KORT (1-5 dagen)' or 'LANG (1-3 weken)'
                     say('INVESTEREN '..horizon..': '..name(id)..
-                        ' | max instap '..(maxBuy and gold(maxBuy) or 'onbekend')..
-                        ' | verkoopscenario '..(target and gold(target) or 'onbekend')..
+                        ' | max instap '..(maxBuy and goldExact(maxBuy) or 'onbekend')..
+                        ' | verkoopscenario '..(target and goldExact(target) or 'onbekend')..
                         ' | zelf AH en verkoopsnelheid controleren!')
                 else
                     local verb=action=='REVIEW_SELL' and 'Verkoop controleren' or
