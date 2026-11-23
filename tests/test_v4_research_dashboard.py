@@ -195,6 +195,14 @@ class DashboardTests(unittest.TestCase):
             {'mode':'interesting','sort':'signal','q':'no match'})
         self.assertEqual(count,0)
         self.assertEqual(html,'')
+        affordable,_=v4_dashboard.opportunity_rows(
+            self.report['opportunities'],self.now,
+            {'mode':'budget','sort':'signal','q':''},budget=10000)
+        expensive,_=v4_dashboard.opportunity_rows(
+            self.report['opportunities'],self.now,
+            {'mode':'budget','sort':'signal','q':''},budget=9999)
+        self.assertEqual(affordable,1)
+        self.assertEqual(expensive,0)
 
     def test_exact_copper_format(self):
         self.assertEqual(v4_dashboard.money(14703),'1g 47s 03c')
