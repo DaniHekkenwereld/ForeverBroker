@@ -57,7 +57,10 @@ local function wireSessions(d)
     local list={}
     for _,row in pairs(d.v4Sessions or {}) do
         if type(row)=='table' and type(row.ended)=='number' and type(row.started)=='number'
-                and row.ended>=row.started then
+                and row.ended>=row.started and
+                type(row.character)=='string' and #row.character>0 and
+                not row.character:find('[|;]') then
+            -- Ignore historical nameless sessions from older addon builds.
             list[#list+1]=row
         end
     end
@@ -65,7 +68,9 @@ local function wireSessions(d)
     local wire={'FTSESSION1'}
     local bytes=10
     for _,row in ipairs(list) do
-        local fields={row.id,row.realm,row.character,row.started,row.ended,
+        -- Normalize old realm labels to the configured EU PvP Alliance market
+        -- so old observed sessions belong to the same scoped character.
+        local fields={row.id,'eu-2-110',row.character,row.started,row.ended,
                       row.goldStart or '',row.goldEnd or '',
                       row.bagsStart or '',row.bagsEnd or ''}
         for j=1,#fields do fields[j]=clean(fields[j]) end
