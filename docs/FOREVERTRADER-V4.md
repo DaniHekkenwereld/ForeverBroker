@@ -14,7 +14,7 @@ Sinds de Forever-clientwijzigingen in november 2026 kunnen `GetRealmName()` en v
 
 Oude characterobservaties met foutieve realm-labels worden voor hetzelfde Alliance-character zonder gegevensverlies naar de marktcode gemigreerd. Het sessiejournaal gebruikt dezelfde marktcode. De export heeft precies 14 velden per character; legacy-exports met foutieve structuur worden nooit stil als kooptransacties behandeld.
 
-**Een nieuwe pc:** de addon en Windows-bridge moeten eenmalig worden geïnstalleerd en gekoppeld, maar in WoW zijn geen realm- of marktcommando's nodig.
+**Een nieuwe pc:** de addon en Windows-bridge moeten eenmalig worden geïnstalleerd en gekoppeld, maar in WoW zijn geen realm- of marktcommando's nodig. De bridge gebruikt uitsluitend de WoW-accountmapnaam als basis voor de gehashte accountidentiteit; een andere schijfletter of installatielocatie verandert je character-key dus niet.
 
 ## De complete datastroom
 
