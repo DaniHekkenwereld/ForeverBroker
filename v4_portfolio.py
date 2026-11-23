@@ -222,16 +222,44 @@ def build(db,market,market_t,clock,cfg,investments=None):
             if len(buy)>=35:break
         if len(buy)>=35:break
     ideas=[]
+    thematic_history=v4_investing.history_for_ids(db,list(THEMES),market_t) if market_t>0 else {}
     date=dt.datetime.fromtimestamp(clock,dt.timezone.utc).date()
     days_to_raid=(RAID_OPEN_DATE-date).days
     for item,(theme,thesis) in THEMES.items():
         q=market.get(item) or {}
         inv=by_invest.get(item) or {}
+        ask=q.get('ask') if v4_investing.positive(q.get('ask')) else None
+        pts=thematic_history.get(item,[])
+        median7,n7,d7=v4_investing.section(pts,market_t,0,168) if market_t>0 else (None,0,0)
+        latest24,n24,_=v4_investing.section(pts,market_t,0,24) if market_t>0 else (None,0,0)
+        prior24,prior_n,_=v4_investing.section(pts,market_t,24,48) if market_t>0 else (None,0,0)
+        drift24=v4_investing.pct(latest24,prior24) if n24>=3 and prior_n>=3 else None
+        discount=v4_investing.pct(ask,median7)
+        liquid=type(q.get('vol24')) is int and q['vol24']>=10
+        if not source_fresh:
+            theme_action='BRONPRIJS VEROUDERD'
+        elif ask is None:
+            theme_action='GEEN VERHANDELBARE BRONPRIJS'
+        elif n7<8 or d7<3:
+            theme_action='MEER HISTORIE NODIG'
+        elif not liquid:
+            theme_action='WEINIG VOLUME — AFWACHTEN'
+        elif drift24 is not None and drift24<=-10:
+            theme_action='KOERS DAALT — NIET BLIND INSTAPPEN'
+        elif discount is not None and discount<=-15:
+            theme_action='GOEDKOPER DAN HISTORIE — IN GAME CONTROLEREN'
+        elif discount is not None and discount>=25:
+            theme_action='DUUR T.O.V. HISTORIE — VERKOOP CONTROLEREN'
+        else:
+            theme_action='VOLGEN OP BASIS VAN PRIJSHISTORIE'
         ideas.append({'id':item,'name':q.get('name') or f'Item {item}',
                       'theme':theme,'thesis':thesis,
                       'ask':q.get('ask') if v4_investing.positive(q.get('ask')) else None,
                       'volume_24h':q.get('vol24') if type(q.get('vol24')) is int else None,
                       'trend_7d_pct':inv.get('change_7d_pct'),
+                      'last7_median':median7,'discount_vs_7d_pct':discount,
+                      'change_24h_pct':drift24,'history_days_7d':d7,
+                      'history_samples_7d':n7,'portfolio_action':theme_action,
                       'owned':holdings.get(item,{}).get('total',0),
                       'event_date':RAID_OPEN_DATE.isoformat(),
                       'event_name':'Eerste raids openen (bevestigd)',
