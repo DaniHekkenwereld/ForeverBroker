@@ -146,8 +146,8 @@ class PortfolioAdviceTests(unittest.TestCase):
         p=v4_portfolio.build(self.db,self.market,self.now,self.now,self.cfg,[])
         t=next(x for x in p['themes'] if x['id']==12363)
         self.assertIn('crafting',t['thesis'])
-        self.assertIsNone(t['event_date'])
-        self.assertIn('GEEN BEVESTIGDE',t['status'])
+        self.assertEqual(t['event_date'],'2026-12-09')
+        self.assertIn('PRIJSIMPACT ONBEWEZEN',t['status'])
 
     def test_no_stale_buy_signal(self):
         inv={'id':7068,'name':'Elemental Fire','ask':1000,
