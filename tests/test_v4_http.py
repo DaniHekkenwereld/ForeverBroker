@@ -65,6 +65,28 @@ class HttpV4Tests(unittest.TestCase):
         self.assertEqual(resp['strategies'][0]['character'],'Mage')
         self.assertTrue(resp['strategies'][0]['plan'].startswith('FT3|eu-2-110|'))
         self.assertIn('1234:0:0:0:0',resp['strategies'][0]['plan'])
+    def test_forever_full_name_sync_roundtrip(self):
+        stamp=self.now
+        char={'character_key':'acchash:eu-2-110:Warrior Pump',
+              'realm':'eu-2-110','character':'Warrior Pump','faction':'Alliance',
+              'last_seen':stamp,'gold':750000,'wallet_at':stamp,
+              'bags':{'2589':3},'bags_at':stamp,'auctions':{},
+              'auctions_at':stamp,'mail_at':None,'mail_pending':None,
+              'mail_ready':None,'mail_attachments':None}
+        ses={'id':'eu-2-110:Warrior_Pump:123:1','character_key':char['character_key'],
+             'started_at':stamp-120,'ended_at':stamp,
+             'gold_start':750000,'gold_end':750000,
+             'bags_start':{'2589':3},'bags_end':{'2589':3}}
+        response=self.req('/api/v4/sync','POST',{
+            'schema':'FT4SYNC1','characters':[char],'sessions':[ses]})
+        self.assertTrue(response['ok'])
+        self.assertEqual(response['characters_updated'],1)
+        self.assertEqual(response['sessions_added'],1)
+        plans=self.req('/api/v4/strategies')['strategies']
+        self.assertEqual(len(plans),1)
+        self.assertEqual(plans[0]['realm'],'eu-2-110')
+        self.assertEqual(plans[0]['character'],'Warrior Pump')
+
     def test_authentication_is_mandatory(self):
         with self.assertRaises(urllib.error.HTTPError) as err:
             self.req('/api/v4/strategies',token='wrong')
