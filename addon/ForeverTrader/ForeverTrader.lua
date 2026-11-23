@@ -247,7 +247,7 @@ update=function()
     if not s.loggingOut then wallet() end;s.market=realmOK();s.reserve=math.max(150000,math.floor(s.cash*.20));s.planValid=plan and now()<plan.expires
     s.targetMode=targetMode
     if pending and now()-pending.at>=20 then pending=nil end
-    s.searchPending=pending~=nil;s.searchCandidate=not s.buyBlocked and T.choose(plan,targetBook,bags,listed,now(),lastTry) or nil
+    s.searchPending=pending~=nil;s.searchCandidate=T.choose(plan,targetBook,bags,listed,now(),lastTry)
     local remaining=math.max(0,50000-(s.liveSpent or 0))
     buys,sells=L.matches(plan,targetBook,bags,s.cash,s.reserve,now(),s.scanAt,listed,true,s.live and math.min(10000,remaining) or nil)
     if s.buyBlocked or pending then buys={} end;if pending then sells={} end
@@ -424,12 +424,10 @@ local function autoBlockReason()
     if not s.ahOpen then return 'Auction House niet herkend. Open het AH-venster en probeer /ft auto status.' end
     if not realmOK() then return 'Alleen EU Alliance wordt ondersteund.' end
     if not plan then return 'Geen geldige V4-zoeklijst geladen. /ft v4 kan wel tasadviezen tonen zonder zoeklijst.' end
-    if now()>=plan.expires then return 'V4-zoeklijst verlopen. Sluit WoW volledig en voer PREPARE-V4.bat opnieuw uit.' end
+    if now()>=plan.expires then return 'V4-zoeklijst verlopen; de Windows-bridge werkt deze bij voor de volgende WoW-start.' end
     if not plan.rows or #plan.rows==0 then return 'Server heeft 0 AH-items op de zoeklijst gezet.' end
     if pending then return 'Wachten op AH-resultaten voor item '..pending.id..'.' end
-    if s.bought or s.buyBlocked then return 'Wacht op mailboxcontrole na een aankoop.' end
-    if s.mailAlert then return 'Nieuw mailsignaal; controleer eerst de mailbox.' end
-    if s.buyCount>0 or s.sellCount>0 then return 'Actueel koop/verkoopadvies wacht op je beoordeling.' end
+    -- Mail alerts, manual sales and buy-blocks must not stop read-only searches.
     if not s.searchCandidate then return 'Alle zoekitems zijn recent gecontroleerd of worden nog verwerkt.' end
     if now()-lastQuery<5 then return 'Wachten op AH-zoekcooldown (5 seconden).' end
     local a=C_AuctionHouse
@@ -503,11 +501,11 @@ local elapsed=0; frame:SetScript('OnUpdate',function(_,dt)
         if s.active then check(function() mailSignal();update();maybeAutoSearch() end) end
     end
 end)
-local input=CreateFrame('EditBox','ForeverTraderPlanInput',ui,'InputBoxTemplate');input:SetSize(390,22);input:SetPoint('BOTTOM',0,36);input:SetAutoFocus(false);input:SetMaxLetters(12000);input:Hide()
-input:SetScript('OnEnterPressed',function(self) local p,err=L.plan(self:GetText(),now());if not p then say(err);return end;plan=p;db().planText=self:GetText();self:SetText('');self:ClearFocus();self:Hide();say('Planning geladen: '..#p.rows..' items (inclusief alleen-controleren).');update() end)
-input:SetScript('OnEscapePressed',function(self) self:ClearFocus();self:Hide() end)
 local function button(label,x,fn) local b=CreateFrame('Button',nil,ui,'UIPanelButtonTemplate');b:SetSize(124,22);b:SetPoint('BOTTOMLEFT',x,10);b:SetText(label);b:SetScript('OnClick',fn);return b end
-button('Planning plakken',12,function() input:Show();input:SetFocus() end)
+button('Auto status',12,function() check(function()
+    update()
+    say('Zoeklijst: '..(plan and #plan.rows or 0)..' items. '..(autoBlockReason() or 'Klaar om te zoeken.'))
+end) end)
 button('Naar mailbox',150,function() s.bought=true;s.buyBlocked=true;lastCode=nil;check(update) end)
 button('Zoek volgend',288,function() check(searchNext) end)
 SLASH_FOREVERTRADER1='/ft';SlashCmdList.FOREVERTRADER=function(msg)
@@ -544,7 +542,7 @@ SLASH_FOREVERTRADER1='/ft';SlashCmdList.FOREVERTRADER=function(msg)
                 ' | Faction: '..faction..' | Region: '..region..
                 ' | Export: '..(db().charactersWire and #db().charactersWire>7 and 'aanwezig' or 'leeg'))
             if not realmOK() then say('Waarschuwing: deze client is geen EU Alliance. Geen live AH-adviezen.') end
-        elseif msg=='plan' then ui:Show();input:Show();input:SetFocus();say('Plak de FT3-planning uit het dashboard en druk Enter.')
+        elseif msg=='plan' then say('V4 gebruikt automatisch de serverzoeklijst. Handmatig plakken is niet nodig.')
         elseif msg=='bought' or msg=='mail' then s.bought=true;s.buyBlocked=true;targetBook={};lastCode=nil
         elseif msg=='search' then searchNext()
         elseif msg:match('^search %d+$') then searchNext(tonumber(msg:match('%d+')))
@@ -560,7 +558,7 @@ SLASH_FOREVERTRADER1='/ft';SlashCmdList.FOREVERTRADER=function(msg)
             if count==0 then say('Geen V4-adviezen beschikbaar voor dit character.') end
             lastCode=nil
         elseif msg=='status' or msg=='' then ui:Show();lastCode=nil
-        else say('/ft start | stop | v4 | identity | market | auto on/off/status | live on/off | plan | bought | mail | search [itemID] | status');return end
+        else say('/ft start | stop | v4 | identity | market | auto on/off/status | live on/off | bought | mail | search [itemID] | status');return end
         update()
     end)
 end
