@@ -36,7 +36,8 @@ function V.plan(d,clock,realm,character,logic)
         local p=logic.plan(code,clock)
         if p then return p,true end
     end
-    return logic.plan(d.planText,clock),false
+    -- V4 must never silently fall back to a manually pasted/legacy plan.
+    return nil,false
 end
 
 function V.actions(d,realm,character,display)
