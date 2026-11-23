@@ -166,6 +166,44 @@ class BridgeTests(unittest.TestCase):
         self.assertEqual(v4_bridge.account_identity(a),'ACCOUNT#1')
         self.assertEqual(v4_bridge.account_identity(a),v4_bridge.account_identity(b))
 
+    def test_previous_first_name_session_does_not_reject_full_name_character(self):
+        # Older addon used only the first name; Forever v4 now uses first+last.
+        now=1800000100
+        account='482614058#1'
+        source=('ForeverTraderDB = {\\n'
+                ' ["charactersWire"] = "FTCHAR1;1800000000|eu-2-110|Mage Pump|Alliance|500000|1800000000|1800000000|||0||||",\\n'
+                ' ["sessionsWire"] = "FTSESSION1;eu-2-110:Mage:1800000000:1|eu-2-110|Mage|1800000000|1800000050|400000|500000||",\\n'
+                '}\\n')
+        chars=characters.parse_saved_variables(source,now,account)
+        sessions=v4_bridge.parse_sessions(source,now,account)
+        self.assertEqual(len(chars),1)
+        self.assertEqual(len(sessions),1)
+        usable,skipped=v4_bridge.compatible_sessions(chars,sessions,now)
+        self.assertEqual(usable,[])
+        self.assertEqual(skipped,1)
+        self.assertEqual(chars[0]['character'],'Mage Pump')
+
+    def test_valid_full_name_session_is_kept(self):
+        now=1800000100
+        account='account-one'
+        source=('ForeverTraderDB = {\\n'
+                ' ["charactersWire"] = "FTCHAR1;1800000000|eu-2-110|Mage Pump|Alliance|500000|1800000000|1800000000|||0||||",\\n'
+                ' ["sessionsWire"] = "FTSESSION1;eu-2-110:Mage_Pump:1800000000:1|eu-2-110|Mage Pump|1800000000|1800000050|400000|500000||",\\n'
+                '}\\n')
+        chars=characters.parse_saved_variables(source,now,account)
+        sessions=v4_bridge.parse_sessions(source,now,account)
+        usable,skipped=v4_bridge.compatible_sessions(chars,sessions,now)
+        self.assertEqual(skipped,0)
+        self.assertEqual(len(usable),1)
+
+    def test_invalid_character_payload_is_caught_before_network(self):
+        now=1800000100
+        rows=[dict(character_key='x:y:z',realm='eu-2-110',
+                   character='Mage Pump',faction='Alliance',last_seen=now+500,
+                   wallet_at=None,bags_at=None,auctions_at=None,mail_at=None)]
+        with self.assertRaisesRegex(ValueError,'last_seen'):
+            v4_bridge.compatible_sessions(rows,[],now)
+
     def test_session_wire_parser(self):
         text='ForeverTraderDB = {\n ["sessionsWire"] = "FTSESSION1;Forever:Mage:100:1|Forever|Mage|100|200|1000|1500|2589:2|2589:10",\n}\n'
         rows=v4_bridge.parse_sessions(text,200,'account-a')
