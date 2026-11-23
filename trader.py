@@ -576,13 +576,16 @@ def dashboard(db,folder,c,clock,status,localmsg,m,mode):
     old.atomic(folder/'dashboard.html',body)
 
 def next_market_attempt(last_attempt):
-    """Stay under one market GET per hour and avoid fetching just before
-    the EU Forever snapshot's observed :22 publication cadence."""
+    """At least 60 minutes between requests; don't fetch before the :27
+    window following the provider's observed :22 publication cadence."""
     if not last_attempt:return 0
     earliest=last_attempt+3600
-    due=dt.datetime.fromtimestamp(earliest,UTC).replace(minute=27,second=0,microsecond=0)
-    if int(due.timestamp())<earliest:due+=dt.timedelta(hours=1)
-    return int(due.timestamp())
+    due=dt.datetime.fromtimestamp(earliest,UTC)
+    if due.minute<27:
+        return int(due.replace(minute=27,second=0,microsecond=0).timestamp())
+    # A request at :27:37 must be eligible again at :27:37 next hour,
+    # not postponed until :27:00 in the hour after that.
+    return earliest
 
 
 def market_wait_status(db, clock):
