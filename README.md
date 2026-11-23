@@ -1,5 +1,21 @@
 # ForeverBroker
 
+## ForeverTrader 1.0 Beta — Portfolio & Trading Desk
+
+**Bestaande Windows-installatie morgen gebruiken:** sluit WoW, voer eerst `UPDATE.bat` uit en daarna `BETA-START.bat`. Dit werkt de Windows-addon en VPS bij, voert regressietests uit, synchroniseert en opent het dashboard. SSH/sudo kan om wachtwoorden vragen.
+
+- **Jouw portfolio:** gold, tassen inclusief gebonden items, bank en banktassen, uitgeruste items en eigen AH-veilingen, met per-character tijdstempels. Open de bank op elk character minstens één keer en log uit zodat WoW zijn SavedVariables wegschrijft.
+- **Investeringsradar:** korte en lange prijsontwikkelingen, historische instapmomenten, risico, liquiditeit en risicogewogen goldbudgetten per character.
+- **Daghandel:** ochtend kopen/avond verkopen alleen bij voldoende op meerdere complete dagen aangetroffen prijspatronen; niet op basis van een losse voorspelling.
+- **Raid-/tieronderzoek:** thema's voor Arcanite, enchanting-materialen en consumables, met speculatieve prijsimpact duidelijk apart van officiële data.
+- **Echte transacties bijhouden:** optioneel na een echte inkoop `/ft trade buy 12363 2 15.25g` of na werkelijke netto verkoop `/ft trade sell 12363 2 18g`; FIFO-kostprijzen voor alleen bekende handmatige transacties.
+- **AH-verificatie:** `/ft auto on` zoekt de VPS-kandidaten; `/ft auto status` toont exacte game-zoekactiviteit. Aankopen en verkopen zelf uitvoeren.
+
+**Beperking:** TK publiceert doorgaans een marktsnapshot per uur. SavedVariables worden pas bij logout of /reload naar Windows geschreven, zodat tijdens het spelen geen live bank- of portfolio-synchronisatie mogelijk is. Vraagprijs en scenario zijn niet hetzelfde als gegarandeerde verkoopwinst. De beta is automatisch getest met Python-/Lua-regressies; een echte WoW Forever-clientsessie blijft noodzakelijk voor definitieve validatie.
+
+[Lees de 1.0 Beta-handleiding](docs/V1-BETA-HANDLEIDING.md).
+
+
 ForeverTrader **v4.0.0** — centrale 24/7 AH-server, per-character handelsstrategie en WoW-addon voor WoW Forever EU PvP Alliance. De oudere paper-tradingengine blijft apart beschikbaar.
 
 ## Ubuntu 26 VPS: installatie met één script
