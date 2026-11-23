@@ -56,6 +56,15 @@ def store(db,entries,received,valid_keys):
         r=validate(record,received)
         if r['character_key'] not in valid_keys:
             raise ValueError('Trade refers to unknown account character')
+        existing=db.execute("""SELECT character_key,happened_at,side,item_id,
+                                quantity,total_copper FROM v4_manual_trades
+                                WHERE trade_id=?""",(r['id'],)).fetchone()
+        if existing:
+            current=(r['character_key'],r['at'],r['side'],r['item_id'],
+                     r['quantity'],r['total_copper'])
+            if tuple(existing)!=current:
+                raise ValueError('Trade ID re-used with different details')
+            continue
         try:
             cur=db.execute("""INSERT OR IGNORE INTO v4_manual_trades
               (trade_id,character_key,happened_at,received_at,side,item_id,quantity,
