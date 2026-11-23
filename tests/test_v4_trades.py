@@ -39,6 +39,14 @@ class TradeLedgerTests(unittest.TestCase):
         self.assertEqual(state['reported_realized_net'],40000)
         self.assertEqual(state['unmatched_sales'],0)
 
+    def test_conflicting_same_trade_id_is_rejected(self):
+        original=self.row('conflict','BUY',1,10000)
+        v4_trades.store(self.db,[original],self.now,{self.key})
+        changed={**original,'total_copper':20000}
+        with self.assertRaises(ValueError):
+            v4_trades.store(self.db,[changed],self.now,{self.key})
+        self.assertEqual(v4_trades.summarize(self.db)['positions'][12363]['known_cost'],10000)
+
     def test_unrecorded_initial_inventory_cannot_invent_profit(self):
         sale=self.row('4','SELL',4,800000)
         self.assertEqual(v4_trades.store(self.db,[sale],self.now,{self.key}),1)
