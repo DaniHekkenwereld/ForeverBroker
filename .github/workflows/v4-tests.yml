@@ -17,6 +17,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+      - name: Install timezone database (required by zoneinfo on Windows)
+        run: python -m pip install tzdata
       - name: Syntax
         run: python -m compileall -q trader.py legacy.py opportunities.py characters.py sync_client.py v4_engine.py v4_server.py v4_bridge.py
       - name: Python regression suite
