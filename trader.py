@@ -159,7 +159,7 @@ def import_history(db,c,m,clock,limit=None):
     # trading and gear/tier research; no guaranteed demand is assumed.
     core=[7068,12363,14344,16203,12360,13468]
     priorities=[i for i in core if i in m and type(m[i].get('ask')) is int and m[i]['ask']>0]
-    ids=list(dict.fromkeys(priorities+watched+ranked+fallback))[:c['history_max_items']]
+    ids=list(dict.fromkeys(priorities+ranked+watched+fallback))[:c['history_max_items']]
     done=0
     for i in ids:
         a=db.execute('SELECT attempt,success FROM import_log WHERE item_id=?',(i,)).fetchone()
