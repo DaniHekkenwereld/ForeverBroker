@@ -24,6 +24,7 @@ import v4_dashboard
 import v4_engine
 import v4_server
 
+TRADE_WIRE=re.compile(r'^\s*\["tradesWire"\]\s*=\s*"([0-9A-Za-z|:;_. -]{1,59000})"\s*,?\s*$',re.M)
 SESSION=re.compile(r'^\s*\["sessionsWire"\]\s*=\s*"([^"\\]{1,49000})"\s*,?\s*$',re.M)
 FT3=re.compile(r'^FT3\|eu-2-110\|\d+\|\d+;(?:\d+:0:0:0:0(?:;|$)){1,20}$')
 FIELD=re.compile(r'^([ \t]*)\["(v4PlanBlob|v4ActionsBlob)"\]\s*=\s*"[^"\\]*"\s*,?\s*$',re.M)
@@ -95,6 +96,36 @@ def parse_sessions(text, now, account):
                            bags_end=characters.parse_counts(bags_end)))
     if skipped:
         print(f'V4: {skipped} onvolledige sessie(s) zonder characternaam of realm overgeslagen.',flush=True)
+    return result
+
+
+def parse_trades(text,now,account):
+    """Parse only manual addon-entered trades, never interpret item/gold deltas."""
+    match=TRADE_WIRE.search(text)
+    if not match:return []
+    rows=match.group(1).split(';')
+    if rows.pop(0)!='FTTRADE1' or len(rows)>250:
+        raise ValueError('Ongeldig handmatig transactieoverzicht')
+    keyprefix=hashlib.sha256(account.encode('utf-8')).hexdigest()[:24]
+    result=[]
+    seen=set()
+    for line in rows:
+        parts=line.split('|')
+        if len(parts)!=8:raise ValueError('Ongeldige trade export rij')
+        trade_id,realm,character,at,side,item,qty,copper=parts
+        if not 1<=len(realm)<=100 or not 1<=len(character)<=100:
+            raise ValueError('Ongeldige trade-identiteit')
+        if any(c in realm+character for c in '";\\|\r\n'):
+            raise ValueError('Ongeldige trade-karakters')
+        tid=keyprefix+':'+trade_id
+        if tid in seen:raise ValueError('Dubbele handmatige trade-ID')
+        seen.add(tid)
+        row=dict(id=tid,character_key=keyprefix+':'+realm+':'+character,
+                 at=int(at),side=side,item_id=int(item),
+                 quantity=int(qty),total_copper=int(copper))
+        import v4_trades
+        v4_trades.validate(row,now)
+        result.append(row)
     return result
 
 
@@ -225,20 +256,23 @@ def api_request(base,token,endpoint,payload=None):
                          (': '+detail if detail else '')) from None
 
 
-def send_sync(base,token,chars,sessions):
+def send_sync(base,token,chars,sessions,trades=None):
     """Upload character observations even if a legacy session batch is rejected.
 
     Return the number of sessions actually accepted for the summary. The
     original SavedVariables file is never altered or pruned by this method.
     """
-    if not chars and not sessions:return 0
-    payload={'schema':'FT4SYNC1','characters':chars,'sessions':sessions}
+    if trades is None:trades=[]
+    if not chars and not sessions and not trades:return 0
+    payload={'schema':'FT4SYNC1','characters':chars,'sessions':sessions,
+             'trades':trades}
     try:
         response=api_request(base,token,'/api/v4/sync',payload)
     except ValueError as exc:
         if chars and sessions and '/api/v4/sync HTTP 400' in str(exc):
             response=api_request(base,token,'/api/v4/sync',
-                                 {'schema':'FT4SYNC1','characters':chars,'sessions':[]})
+                                 {'schema':'FT4SYNC1','characters':chars,'sessions':[],
+                                  'trades':trades})
             print('V4: sessiebatch geweigerd; charactergegevens apart gesynchroniseerd. '
                   'Originele sessies blijven bewaard.',flush=True)
             sessions=[]
@@ -279,10 +313,13 @@ def sync_once(prepared_only=False):
         raise ValueError('Geen volledige Forever-characternaam in de export. '
                          'Log eenmaal in met de bijgewerkte addon en sluit WoW volledig af.')
     sessions=parse_sessions(text,now,account)
+    trades=parse_trades(text,now,account)
     sessions,skipped=compatible_sessions(chars,sessions,now)
+    keys={c['character_key'] for c in chars}
+    trades=[trade for trade in trades if trade['character_key'] in keys]
     if skipped:
         print('V4: '+str(skipped)+' oude sessie(s) met afwijkende naam/markt overgeslagen; origineel bewaard.',flush=True)
-    uploaded_sessions=send_sync(base,token,chars,sessions)
+    uploaded_sessions=send_sync(base,token,chars,sessions,trades)
     strategy=api_request(base,token,'/api/v4/strategies')
     if strategy.get('version')!='4.0.0' or strategy.get('market')!='eu-2-110':
         raise ValueError('Verkeerde V4 server/markt')
@@ -290,7 +327,7 @@ def sync_once(prepared_only=False):
     if not isinstance(plans,list):raise ValueError('Ongeldig serverantwoord')
     dashboard=v4_dashboard.write(trader.ROOT/'data'/'v4'/'dashboard.html',plans,now)
     result=write_plans(path,text,plans) if not prepared_only else 'Sessies naar VPS gestuurd'
-    return f'Verstuurd: {len(chars)} characters, {uploaded_sessions} sessies. {result} | Dashboard: {dashboard}'
+    return f'Verstuurd: {len(chars)} characters, {uploaded_sessions} sessies, {len(trades)} handmatige trades. {result} | Dashboard: {dashboard}'
 
 
 def main():
