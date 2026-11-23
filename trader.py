@@ -153,7 +153,13 @@ def import_history(db,c,m,clock,limit=None):
     fallback=sorted((i for i,x in m.items() if type(x.get('ask')) is int and x['ask']>0 and
                      type(x.get('vol24')) is int and x['vol24']>=c['min_daily_volume']),
                     key=lambda i:history_priority(m[i],c),reverse=True)
-    ids=list(dict.fromkeys(ranked+watched+fallback))[:c['history_max_items']]
+    # The provider's scarce hourly history budget must first cover the
+    # observable raid/crafting watchlist, not arbitrary 2nd-ASK price gaps.
+    # Elemental Fire and Arcane Crystal are useful test cases for intraday
+    # trading and gear/tier research; no guaranteed demand is assumed.
+    core=[7068,12363,14344,16203,12360,13468]
+    priorities=[i for i in core if i in m and type(m[i].get('ask')) is int and m[i]['ask']>0]
+    ids=list(dict.fromkeys(priorities+watched+ranked+fallback))[:c['history_max_items']]
     done=0
     for i in ids:
         a=db.execute('SELECT attempt,success FROM import_log WHERE item_id=?',(i,)).fetchone()
