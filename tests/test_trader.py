@@ -1,6 +1,8 @@
 import pathlib, tempfile, unittest, time, json
 import legacy as ft
-C=json.loads((ft.ROOT/'config.json').read_text())
+# Never parse the user's mutable config.json in regression tests. It may be
+# rewritten by Windows PowerShell with a UTF-8 BOM or local account settings.
+C=json.loads((pathlib.Path(__file__).parent/'fixtures'/'trader_config.json').read_text(encoding='utf-8-sig'))
 class TraderTests(unittest.TestCase):
     def test_market_named_fields(self):
         n=ft.now(); f=['vol24','ask','ask2','listed','depth5','flowHours']
