@@ -91,6 +91,9 @@ self=ForeverTraderDB.characters['eu-2-110#Mage Pump']
 assert(self.bank[12363]==5 and self.bank[16203]==3,
        'main bank and first bank bag must be counted independently')
 assert(self.bankBound[16203]==3,'bank soulbound items must be flagged')
+SlashCmdList.FOREVERTRADER('portfolio')
+assert(prints[#prints-2]:find('bank',1,true) and prints[#prints-1]:find('Bank laatst gezien',1,true),
+       '/ft portfolio must report real bag/bank/equipment and saved timestamp')
 assert(ForeverTraderDB.stockWire:find('FTSTOCK1;',1,true),
        'new stockWire must coexist with old 14-column export')
 fire('BANKFRAME_CLOSED')
