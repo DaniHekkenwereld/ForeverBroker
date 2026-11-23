@@ -117,5 +117,32 @@ currentMoney=0
 fire('PLAYER_LOGOUT')
 assert(ForeverTraderDB.wallet==beforeLogoutWallet,'logout must not overwrite wallet with 0g')
 assert(ForeverTraderDB.sessionsWire:match('^FTSESSION1;'),'logout should persist V4 session')
+-- Realm APIs may be empty on the Forever client early in login.
+-- Ensure no invalid session is exported, then recover when realm becomes available.
+clock=clock+30
+GetRealmName=function() return '' end
+GetNormalizedRealmName=function() return '' end
+GetCVar=function() return '' end
+UnitName=function() return 'Rogue' end
+fire('PLAYER_LOGIN')
+assert(ForeverTraderDB.characters['Forever#Rogue']==nil,'empty realm must not create character row')
+assert(ForeverTraderDB.v4ActiveSession==nil,'empty realm must not start session')
+SlashCmdList.FOREVERTRADER('realm Forever')
+assert(ForeverTraderDB.characters['Forever#Rogue'],'manual realm should restore character export')
+assert(ForeverTraderDB.v4ActiveSession,'manual realm should start session')
+fire('PLAYER_LOGOUT')
+
+-- A future character should auto-recover from late GetRealmName() after entering world.
+ForeverTraderDB.realmOverride=nil
+UnitName=function() return 'Priest' end
+clock=clock+30
+fire('PLAYER_LOGIN')
+assert(ForeverTraderDB.characters['Forever#Priest']==nil,'do not invent realms')
+GetRealmName=function() return 'Forever' end
+fire('PLAYER_ENTERING_WORLD')
+assert(ForeverTraderDB.characters['Forever#Priest'],'world entry should recover character identity')
+assert(ForeverTraderDB.v4ActiveSession,'world entry should start the delayed session')
+fire('PLAYER_LOGOUT')
+
 for _,v in ipairs(prints)do assert(not v:match('Fout:'),v)end
-realprint('Lua client mock: auto AH search, dual audio marker, wallet and mail checks OK')
+realprint('Lua client mock: auto AH search, dual audio marker, wallet/mail and realm fallback checks OK')
