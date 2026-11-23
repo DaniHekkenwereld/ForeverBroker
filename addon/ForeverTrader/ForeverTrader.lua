@@ -667,6 +667,28 @@ SLASH_FOREVERTRADER1='/ft';SlashCmdList.FOREVERTRADER=function(msg)
                 ' | Export: '..(db().charactersWire and #db().charactersWire>7 and 'aanwezig' or 'leeg'))
             if not realmOK() then say('Waarschuwing: deze client is geen EU Alliance. Geen live AH-adviezen.') end
         elseif msg=='plan' then say('V4 gebruikt automatisch de serverzoeklijst. Handmatig plakken is niet nodig.')
+        elseif msg:match('^trade ') then
+            local side,item,qty,amount=msg:match('^trade (%a+) (%d+) (%d+) ([%d%.]+g?)$')
+            if not side or (side~='buy' and side~='sell') then
+                say('Gebruik: /ft trade buy 12363 2 15.25g of /ft trade sell 12363 2 18g (SELL is NET ontvangen gold).')
+                return
+            end
+            local goldAmount=amount:sub(-1)=='g'
+            local n=tonumber(goldAmount and amount:sub(1,-2) or amount)
+            local copper=n and (goldAmount and math.floor(n*10000+.5) or n) or nil
+            local realm,character=identity()
+            local id,err=V4 and V4.recordTrade(db(),now(),realm,character,
+                side:upper(),tonumber(item),tonumber(qty),copper)
+            if id then
+                say('Handmatig '..(side=='buy' and 'INKOOP' or 'VERKOOP')..
+                    ' geregistreerd: '..name(tonumber(item))..' x'..qty..
+                    ' | totaal '..goldExact(copper)..
+                    '. Alleen echte transacties invoeren; uitloggen voor VPS-sync.')
+                wallet();recordCharacter('trade')
+            else say('Transactie niet vastgelegd: '..tostring(err or 'V4 ontbreekt')) end
+        elseif msg=='trades' then
+            local d=db();say('Handmatige transacties in export: '..#(d.v4Trades or {})..
+                '. /ft trade buy [itemID] [aantal] [totaal g] of sell (netto na AH-fees).')
         elseif msg=='bought' or msg=='mail' then s.bought=true;s.buyBlocked=true;targetBook={};lastCode=nil
         elseif msg=='search' then searchNext()
         elseif msg:match('^search %d+$') then searchNext(tonumber(msg:match('%d+')))
