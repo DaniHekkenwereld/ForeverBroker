@@ -144,6 +144,22 @@ class BridgeTests(unittest.TestCase):
     def test_rejects_executable_and_unsafe_plan(self):
         p={'realm':'Forever','character':'Mage','plan':'FT3|...;1111:1:1:2:0','actions':[]}
         self.assertEqual(v4_bridge.make_blobs([p])[2],0)
+    def test_legacy_incomplete_session_does_not_block_valid_character_sync(self):
+        # An early PLAYER_LOGIN can generate a session with empty identity.
+        orphan=':100:1||Mage|100|200|1000|1500||'
+        valid='Forever:Mage:101:2|Forever|Mage|101|200|1000|1500||'
+        wire='FTSESSION1;'+orphan+';'+valid
+        source='ForeverTraderDB = {\\n  ["sessionsWire"] = "'+wire+'",\\n}\\n'
+        rows=v4_bridge.parse_sessions(source,200,'account-a')
+        self.assertEqual(len(rows),1)
+        self.assertEqual(rows[0]['character_key'].split(':')[-2:],['Forever','Mage'])
+        self.assertEqual(rows[0]['gold_end'],1500)
+
+    def test_only_incomplete_sessions_are_skipped(self):
+        orphan='Forever::100:1|Forever||100|200|1000|1500||'
+        source='ForeverTraderDB = {\\n  ["sessionsWire"] = "FTSESSION1;'+orphan+'",\\n}\\n'
+        self.assertEqual(v4_bridge.parse_sessions(source,200,'account-a'),[])
+
     def test_session_wire_parser(self):
         text='ForeverTraderDB = {\n ["sessionsWire"] = "FTSESSION1;Forever:Mage:100:1|Forever|Mage|100|200|1000|1500|2589:2|2589:10",\n}\n'
         rows=v4_bridge.parse_sessions(text,200,'account-a')
