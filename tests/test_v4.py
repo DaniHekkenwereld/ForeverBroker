@@ -175,6 +175,21 @@ class BridgeTests(unittest.TestCase):
         self.assertTrue(self.path.with_name('ForeverTrader.lua.v4-backup').exists())
         with patch.object(v4_bridge,'game_running',return_value=False):
             self.assertIn('al actueel',v4_bridge.write_plans(self.path,text,[a,b]))
+    def test_investment_actions_include_safe_price_and_scenario(self):
+        plan={'realm':'Forever','character':'Mage',
+              'plan':'FT3|eu-2-110|1800000000|1800086400;1111:0:0:0:0',
+              'actions':[{'kind':'INVEST_SHORT','id':1111,'qty':1,
+                          'max_buy_before_deposit':15041,'reference_sell':19000},
+                         {'kind':'INVEST_LONG','id':2222,'qty':1,
+                          'max_buy_before_deposit':15516,'reference_sell':19600}]}
+        plans,actions,count=v4_bridge.make_blobs([plan])
+        self.assertEqual(count,1)
+        self.assertIn('INVEST_SHORT:1111:1:15041:19000',actions)
+        self.assertIn('INVEST_LONG:2222:1:15516:19600',actions)
+        self.assertNotIn(':15041:',plans)  # Read-only AH scan never buys.
+        bad={**plan,'actions':[{'kind':'INVEST_SHORT','id':1111,'qty':1,
+                               'max_buy_before_deposit':-5,'reference_sell':19000}]}
+        self.assertNotIn('INVEST_SHORT',v4_bridge.make_blobs([bad])[1])
     def test_never_touch_while_game_runs(self):
         raw=self.path.read_text(encoding='utf-8')
         plan={'realm':'Forever','character':'Mage',
