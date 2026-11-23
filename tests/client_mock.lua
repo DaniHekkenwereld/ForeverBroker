@@ -64,8 +64,10 @@ dofile('addon/ForeverTrader/V4.lua')
 dofile('addon/ForeverTrader/ForeverTrader.lua')
 fire('PLAYER_LOGIN')
 assert(type(ForeverTraderDB.characters)=='table','account-wide snapshot must exist')
-assert(ForeverTraderDB.characters['Forever#Mage'].gold==500000,'gold captured on login')
-assert(ForeverTraderDB.charactersWire:find('Forever|Mage|Alliance|500000',1,true),'bounded export should include mage')
+assert(ForeverTraderDB.characters['eu-2-110#Mage'].gold==500000,'gold captured on login')
+assert(ForeverTraderDB.charactersWire:find('eu-2-110|Mage|Alliance|500000',1,true),'bounded export should include mage')
+local firstRow=ForeverTraderDB.charactersWire:match('^FTCHAR1;([^;]+)')
+assert(firstRow and select(2,firstRow:gsub('|',''))==13,'character export must have exactly 14 columns')
 SlashCmdList.FOREVERTRADER('market')
 SlashCmdList.FOREVERTRADER('start')
 fire('MAIL_SHOW');fire('MAIL_INBOX_UPDATE')
@@ -117,32 +119,30 @@ currentMoney=0
 fire('PLAYER_LOGOUT')
 assert(ForeverTraderDB.wallet==beforeLogoutWallet,'logout must not overwrite wallet with 0g')
 assert(ForeverTraderDB.sessionsWire:match('^FTSESSION1;'),'logout should persist V4 session')
--- Realm APIs may be empty on the Forever client early in login.
--- Ensure no invalid session is exported, then recover when realm becomes available.
+-- Forever realm APIs are deliberately blanked; unrelated functions may
+-- return arbitrary values. No in-game configuration should be required.
 clock=clock+30
 GetRealmName=function() return '' end
 GetNormalizedRealmName=function() return '' end
-GetCVar=function() return '' end
+GetCVar=function() return 'Pump' end
 UnitName=function() return 'Rogue' end
 fire('PLAYER_LOGIN')
-assert(ForeverTraderDB.characters['Forever#Rogue']==nil,'empty realm must not create character row')
-assert(ForeverTraderDB.v4ActiveSession==nil,'empty realm must not start session')
-SlashCmdList.FOREVERTRADER('realm Forever')
-assert(ForeverTraderDB.characters['Forever#Rogue'],'manual realm should restore character export')
-assert(ForeverTraderDB.v4ActiveSession,'manual realm should start session')
+assert(ForeverTraderDB.characters['eu-2-110#Rogue'],'market-scoped character should load without realm APIs')
+assert(ForeverTraderDB.v4ActiveSession,'automatic session should start without realm APIs')
+SlashCmdList.FOREVERTRADER('identity')
+assert(ForeverTraderDB.charactersWire:find('eu-2-110|Rogue|Alliance',1,true),'correct market must be exported')
 fire('PLAYER_LOGOUT')
 
--- A future character should auto-recover from late GetRealmName() after entering world.
-ForeverTraderDB.realmOverride=nil
-UnitName=function() return 'Priest' end
+-- If UnitName arrives late, PLAYER_ENTERING_WORLD recovers automatically.
+UnitName=function() return '' end
 clock=clock+30
 fire('PLAYER_LOGIN')
-assert(ForeverTraderDB.characters['Forever#Priest']==nil,'do not invent realms')
-GetRealmName=function() return 'Forever' end
+assert(ForeverTraderDB.v4ActiveSession==nil,'no anonymous session should be opened')
+UnitName=function() return 'Priest' end
 fire('PLAYER_ENTERING_WORLD')
-assert(ForeverTraderDB.characters['Forever#Priest'],'world entry should recover character identity')
+assert(ForeverTraderDB.characters['eu-2-110#Priest'],'world entry should recover character identity')
 assert(ForeverTraderDB.v4ActiveSession,'world entry should start the delayed session')
 fire('PLAYER_LOGOUT')
-
+assert(ForeverTraderDB.sessionsWire:find('|eu-2-110|Priest|',1,true),'sessions must use market-scoped realm')
 for _,v in ipairs(prints)do assert(not v:match('Fout:'),v)end
-realprint('Lua client mock: auto AH search, dual audio marker, wallet/mail and realm fallback checks OK')
+realprint('Lua client mock: auto AH search, wallet/mail and automatic EU PvP Alliance identity OK')
