@@ -13,6 +13,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import urllib.error
 import urllib.parse
 import urllib.request
 
@@ -20,6 +21,8 @@ import characters
 import legacy
 import trader
 import v4_dashboard
+import v4_engine
+import v4_server
 
 SESSION=re.compile(r'^\s*\["sessionsWire"\]\s*=\s*"([^"\\]{1,49000})"\s*,?\s*$',re.M)
 FT3=re.compile(r'^FT3\|eu-2-110\|\d+\|\d+;(?:\d+:0:0:0:0(?:;|$)){1,20}$')
@@ -92,6 +95,27 @@ def parse_sessions(text, now, account):
     if skipped:
         print(f'V4: {skipped} onvolledige sessie(s) zonder characternaam of realm overgeslagen.',flush=True)
     return result
+
+
+def compatible_sessions(chars,sessions,now):
+    """Keep complete sessions linked to exported full character identities.
+
+    Forever v4 previously wrote surname-as-realm and first-name-only records.
+    Those old observations cannot be safely assigned to a full-name character,
+    so they must not block all present-day character data at the VPS.
+    They remain intact in the original WoW SavedVariables file.
+    """
+    v4_server.validate_characters(chars,now)
+    keys={c['character_key'] for c in chars}
+    good=[]
+    skipped=0
+    for entry in sessions:
+        if entry['character_key'] not in keys:
+            skipped+=1
+            continue
+        v4_engine.normalize_session(entry,now)
+        good.append(entry)
+    return good,skipped
 
 
 def make_blobs(strategies):
@@ -173,12 +197,24 @@ def api_request(base,token,endpoint,payload=None):
     if data is not None:headers['Content-Type']='application/json'
     req=urllib.request.Request(url,data=data,headers=headers,
                                method='POST' if data is not None else 'GET')
-    with urllib.request.urlopen(req,timeout=15) as r:
-        if r.status!=200:raise ValueError('VPS retourneerde geen HTTP 200')
-        blob=r.read(700000)
-        if len(blob)>=700000:raise ValueError('Serverantwoord te groot')
-        response=json.loads(blob)
-    return response
+    try:
+        with urllib.request.urlopen(req,timeout=15) as r:
+            if r.status!=200:raise ValueError('VPS retourneerde geen HTTP 200')
+            blob=r.read(700000)
+            if len(blob)>=700000:raise ValueError('Serverantwoord te groot')
+            response=json.loads(blob)
+        return response
+    except urllib.error.HTTPError as exc:
+        # Never print authorization headers, token or the full payload.
+        detail=''
+        try:
+            body=json.loads(exc.read(2048))
+            if isinstance(body,dict) and isinstance(body.get('error'),str):
+                detail=body['error'][:120]
+        except (ValueError,UnicodeError):
+            pass
+        raise ValueError('VPS '+endpoint+' HTTP '+str(exc.code)+
+                         (': '+detail if detail else '')) from None
 
 
 def account_identity(path):
@@ -205,6 +241,9 @@ def sync_once(prepared_only=False):
     account=account_identity(path)
     chars=characters.parse_saved_variables(text,now,account)
     sessions=parse_sessions(text,now,account)
+    sessions,skipped=compatible_sessions(chars,sessions,now)
+    if skipped:
+        print('V4: '+str(skipped)+' oude sessie(s) met afwijkende naam/markt overgeslagen; origineel bewaard.',flush=True)
     if chars or sessions:
         response=api_request(base,token,'/api/v4/sync',
                              {'schema':'FT4SYNC1','characters':chars,'sessions':sessions})
