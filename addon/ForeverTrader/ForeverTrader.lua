@@ -46,6 +46,8 @@ end
 local s={active=false,mailOpen=false,ahOpen=false,mailKnown=false,ready=0,pending=0,attachments=0,partial=false,cash=0,reserve=150000,threshold=20000,buyCount=0,sellCount=0,mailAlert=false,bought=false,live=false,liveSpent=0,walletKnown=false,autoSearch=false,autoSearchCount=0}
 local plan,book,bags,buys,sells=nil,{},{},{},{}
 local listed={}
+local bankStock,bankBound,bagBound,equipped={},{},{},{}
+local bankOpen=false
 local targetBook,lastTry={},{}
 local pending,lastQuery=nil,0
 local browseFull=false
@@ -75,16 +77,65 @@ local function wallet()
     db().wallet=string.format('%d|%d|%s|%s',now(),money,f,r)
     if recordCharacter then recordCharacter('wallet') end
 end
+-- Never discard a bound or locked item from a portfolio. Bound is tracked
+-- separately so a bank full of BoP gear does not count as sellable stock.
+local function containerStock(containerIds)
+    if not C_Container or not C_Container.GetContainerItemInfo or
+       not C_Container.GetContainerNumSlots then return nil,nil end
+    local counts,bound={},{}
+    for _,bag in ipairs(containerIds) do
+        local ok,slots=pcall(C_Container.GetContainerNumSlots,bag)
+        if ok and type(slots)=='number' and slots>=0 and slots<=200 then
+            for slot=1,slots do
+                local good,item=pcall(C_Container.GetContainerItemInfo,bag,slot)
+                if good and type(item)=='table' and type(item.itemID)=='number' and
+                   item.itemID>0 and item.itemID<=10000000 then
+                    local qty=tonumber(item.stackCount) or 1
+                    if qty>0 and qty<=10000000 then
+                        counts[item.itemID]=(counts[item.itemID] or 0)+qty
+                        if item.isBound then bound[item.itemID]=(bound[item.itemID] or 0)+qty end
+                    end
+                end
+            end
+        end
+    end
+    return counts,bound
+end
 local function getBags()
-    bags={}; if not C_Container or not C_Container.GetContainerItemInfo then return end
-    for bag=0,(NUM_BAG_SLOTS or 4) do for slot=1,C_Container.GetContainerNumSlots(bag) do
-        local a=C_Container.GetContainerItemInfo(bag,slot)
-        if a and a.itemID and not a.isLocked and not a.isBound then bags[a.itemID]=(bags[a.itemID] or 0)+(a.stackCount or 1) end
-    end end
+    local ids={};for i=0,(NUM_BAG_SLOTS or 4) do ids[#ids+1]=i end
+    local counts,bound=containerStock(ids)
+    if not counts then return end
+    bags=counts;bagBound=bound
     local rows={};for id,q in pairs(bags) do rows[#rows+1]=id..':'..q end;table.sort(rows)
     db().bags=now()..';'..table.concat(rows,';')
-    s.bagsKnown=true
+    s.bagsKnown=true;s.bagBoundAt=now()
     if recordCharacter then recordCharacter('bags') end
+end
+local function getBank()
+    if not bankOpen then return end
+    if not C_Container or not C_Container.GetContainerNumSlots then return end
+    local ok,slots=pcall(C_Container.GetContainerNumSlots,-1)
+    -- The main bank must actually be accessible. Never replace the last
+    -- known bank inventory with an empty cache after a missed bank event.
+    if not ok or type(slots)~='number' or slots<=0 then return end
+    local ids={-1}
+    for i=(NUM_BAG_SLOTS or 4)+1,(NUM_BAG_SLOTS or 4)+(NUM_BANKBAGSLOTS or 7) do
+        ids[#ids+1]=i
+    end
+    local counts,bound=containerStock(ids)
+    if not counts then return end
+    bankStock=counts;bankBound=bound;s.bankKnown=true;s.bankAt=now()
+    if recordCharacter then recordCharacter('bank') end
+end
+local function getEquipment()
+    if not GetInventoryItemID then return end
+    local found={}
+    for slot=1,19 do
+        local ok,id=pcall(GetInventoryItemID,'player',slot)
+        if ok and type(id)=='number' and id>0 then found[id]=(found[id] or 0)+1 end
+    end
+    equipped=found;s.equipmentKnown=true;s.equipmentAt=now()
+    if recordCharacter then recordCharacter('equipment') end
 end
 local function mailbox()
     if not s.mailOpen or not GetInboxNumItems or not GetInboxInvoiceInfo or not GetInboxHeaderInfo then return end
@@ -137,11 +188,28 @@ recordCharacter=function(reason)
     if UnitGUID then rec.guid=UnitGUID('player') end
     if not s.loggingOut and s.walletKnown then rec.gold=s.cash;rec.walletAt=now() end
     if s.bagsKnown then
+        rec.bagBound={}
+        for id,q in pairs(bagBound) do
+            if type(id)=='number' and type(q)=='number' and id>0 and q>0 then rec.bagBound[id]=q end
+        end
+        rec.bagBoundAt=s.bagBoundAt
         rec.bags={}
         for id,q in pairs(bags) do
             if type(id)=='number' and type(q)=='number' and id>0 and q>0 then rec.bags[id]=q end
         end
         rec.bagsAt=now()
+    end
+    if s.bankKnown then
+        rec.bank={}
+        rec.bankBound={}
+        for id,q in pairs(bankStock) do if type(id)=='number' and q>0 then rec.bank[id]=q end end
+        for id,q in pairs(bankBound) do if type(id)=='number' and q>0 then rec.bankBound[id]=q end end
+        rec.bankAt=s.bankAt
+    end
+    if s.equipmentKnown then
+        rec.equipment={}
+        for id,q in pairs(equipped) do if type(id)=='number' and q>0 then rec.equipment[id]=q end end
+        rec.equipmentAt=s.equipmentAt
     end
     if s.ownedKnown then
         rec.auctions={}
@@ -188,6 +256,27 @@ recordCharacter=function(reason)
         output[#output+1]=r.line;size=size+#r.line+1
     end
     d.charactersWire=table.concat(output,';')
+    -- Backwards compatible portfolio extension. The original FTCHAR1 wire
+    -- stays unchanged for older clients and all prior character records.
+    local stockRows={}
+    for _,c in pairs(d.characters) do
+        if type(c)=='table' and type(c.name)=='string' and type(c.realm)=='string'
+            and type(c.lastSeen)=='number' then
+            stockRows[#stockRows+1]={at=c.lastSeen,line=table.concat({
+                safe(c.lastSeen),safe(c.realm),safe(c.name),
+                safe(c.bankAt),sums(c.bank),sums(c.bankBound),
+                safe(c.bagBoundAt),sums(c.bagBound),
+                safe(c.equipmentAt),sums(c.equipment)
+            },'|')}
+        end
+    end
+    table.sort(stockRows,function(a,b)return a.at>b.at end)
+    local extra={'FTSTOCK1'};local bytes=8
+    for _,r in ipairs(stockRows) do
+        if #extra>=40 or bytes+#r.line+1>60000 then break end
+        extra[#extra+1]=r.line;bytes=bytes+#r.line+1
+    end
+    d.stockWire=table.concat(extra,';')
 end
 
 local function ensureV4Identity(reason)
@@ -469,7 +558,7 @@ local function maybeAutoSearch()
     searchNext(nil,true)
 end
 local function mailSignal() if HasNewMail then local has=HasNewMail() and true or false;if has and not s.lastMailSignal and not s.mailOpen then s.mailAlert=true end;s.lastMailSignal=has end end
-for _,event in ipairs({'PLAYER_LOGIN','PLAYER_ENTERING_WORLD','PLAYER_LOGOUT','PLAYER_MONEY','MAIL_SHOW','MAIL_CLOSED','MAIL_INBOX_UPDATE','UPDATE_PENDING_MAIL','REPLICATE_ITEM_LIST_UPDATE','AUCTION_HOUSE_SHOW','AUCTION_HOUSE_CLOSED','PLAYER_INTERACTION_MANAGER_FRAME_SHOW','PLAYER_INTERACTION_MANAGER_FRAME_HIDE','BAG_UPDATE_DELAYED','OWNED_AUCTIONS_UPDATED','ITEM_PURCHASED','COMMODITY_PURCHASE_SUCCEEDED','AUCTION_HOUSE_AUCTIONS_EXPIRED','AUCTION_HOUSE_AUCTION_CREATED','ITEM_SEARCH_RESULTS_UPDATED','ITEM_SEARCH_RESULTS_ADDED','COMMODITY_SEARCH_RESULTS_UPDATED','COMMODITY_SEARCH_RESULTS_ADDED','AUCTION_HOUSE_BROWSE_RESULTS_UPDATED','AUCTION_HOUSE_BROWSE_RESULTS_ADDED'}) do pcall(frame.RegisterEvent,frame,event) end
+for _,event in ipairs({'PLAYER_LOGIN','PLAYER_ENTERING_WORLD','PLAYER_LOGOUT','PLAYER_MONEY','MAIL_SHOW','MAIL_CLOSED','MAIL_INBOX_UPDATE','UPDATE_PENDING_MAIL','REPLICATE_ITEM_LIST_UPDATE','AUCTION_HOUSE_SHOW','AUCTION_HOUSE_CLOSED','PLAYER_INTERACTION_MANAGER_FRAME_SHOW','PLAYER_INTERACTION_MANAGER_FRAME_HIDE','BAG_UPDATE_DELAYED','BANKFRAME_OPENED','BANKFRAME_CLOSED','PLAYERBANKSLOTS_CHANGED','PLAYERBANKBAGSLOTS_CHANGED','PLAYER_EQUIPMENT_CHANGED','OWNED_AUCTIONS_UPDATED','ITEM_PURCHASED','COMMODITY_PURCHASE_SUCCEEDED','AUCTION_HOUSE_AUCTIONS_EXPIRED','AUCTION_HOUSE_AUCTION_CREATED','ITEM_SEARCH_RESULTS_UPDATED','ITEM_SEARCH_RESULTS_ADDED','COMMODITY_SEARCH_RESULTS_UPDATED','COMMODITY_SEARCH_RESULTS_ADDED','AUCTION_HOUSE_BROWSE_RESULTS_UPDATED','AUCTION_HOUSE_BROWSE_RESULTS_ADDED'}) do pcall(frame.RegisterEvent,frame,event) end
 frame:SetScript('OnEvent',function(_,e,...)
     local key=...
     check(function()
@@ -478,8 +567,10 @@ frame:SetScript('OnEvent',function(_,e,...)
             s.loggingOut=false;s.autoSearch=false;s.autoSearchCount=0;s.autoResultCount=0;s.lastAutoResult=nil
             s.live=false;s.liveSpent=0;s.walletKnown=false;s.bagsKnown=false;s.ownedKnown=false
             s.mailKnown=false;s.active=false;s.cash=0;s.ahOpen=false;s.mailOpen=false
+            s.bankKnown=false;s.bagBoundAt=nil;s.equipmentKnown=false
+            bankOpen=false;bankStock={};bankBound={};bagBound={};equipped={}
             bags={};listed={};targetBook={}
-            getBags();wallet()
+            getBags();wallet();getEquipment()
             plan=nil
             if V4 then
                 db().realmOverride=nil  -- Remove the obsolete manual realm override.
@@ -488,7 +579,7 @@ frame:SetScript('OnEvent',function(_,e,...)
             else plan=L.plan(db().planText,now()) end
             mailSignal();ui:Hide()
         elseif e=='PLAYER_ENTERING_WORLD' then
-            getBags();wallet()
+            getBags();wallet();getEquipment()
             if V4 then ensureV4Identity('world') end
         elseif e=='PLAYER_LOGOUT' then
             if V4 then
@@ -496,6 +587,11 @@ frame:SetScript('OnEvent',function(_,e,...)
                 V4.logout(db(),now(),s.walletKnown and s.cash or nil,bags)
             end
             recordCharacter('logout');s.loggingOut=true
+        elseif e=='BANKFRAME_OPENED' then bankOpen=true;getBank()
+        elseif e=='BANKFRAME_CLOSED' then getBank();bankOpen=false
+        elseif e=='PLAYERBANKSLOTS_CHANGED' or e=='PLAYERBANKBAGSLOTS_CHANGED' then
+            if bankOpen then getBank() end
+        elseif e=='PLAYER_EQUIPMENT_CHANGED' then getEquipment()
         elseif e=='MAIL_SHOW' then s.mailOpen=true;s.mailKnown=false;s.ahOpen=false;if C_Timer and C_Timer.After then C_Timer.After(1,function() if s.mailOpen then check(function() mailbox();update() end) end end) end
         elseif e=='MAIL_INBOX_UPDATE' then mailbox()
         elseif e=='MAIL_CLOSED' then s.mailOpen=false
@@ -510,7 +606,7 @@ frame:SetScript('OnEvent',function(_,e,...)
         elseif e=='OWNED_AUCTIONS_UPDATED' or e=='AUCTION_HOUSE_AUCTION_CREATED' then owned()
         elseif e=='ITEM_PURCHASED' or e=='COMMODITY_PURCHASE_SUCCEEDED' then if s.active and s.ahOpen then s.bought=true;s.buyBlocked=true;targetBook={} end
         elseif e=='AUCTION_HOUSE_AUCTIONS_EXPIRED' then if s.active then s.mailAlert=true end
-        elseif e=='BAG_UPDATE_DELAYED' then getBags()
+        elseif e=='BAG_UPDATE_DELAYED' then getBags();if bankOpen then getBank() end
         end;update()
     end)
 end)
