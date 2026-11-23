@@ -170,10 +170,10 @@ class BridgeTests(unittest.TestCase):
         # Older addon used only the first name; Forever v4 now uses first+last.
         now=1800000100
         account='482614058#1'
-        source=('ForeverTraderDB = {\\n'
-                ' ["charactersWire"] = "FTCHAR1;1800000000|eu-2-110|Mage Pump|Alliance|500000|1800000000|1800000000|||||||",\\n'
-                ' ["sessionsWire"] = "FTSESSION1;eu-2-110:Mage:1800000000:1|eu-2-110|Mage|1800000000|1800000050|400000|500000||",\\n'
-                '}\\n')
+        source=('ForeverTraderDB = {\n'
+                ' ["charactersWire"] = "FTCHAR1;1800000000|eu-2-110|Mage Pump|Alliance|500000|1800000000|1800000000|||||||",\n'
+                ' ["sessionsWire"] = "FTSESSION1;eu-2-110:Mage:1800000000:1|eu-2-110|Mage|1800000000|1800000050|400000|500000||",\n'
+                '}\n')
         chars=characters.parse_saved_variables(source,now,account)
         sessions=v4_bridge.parse_sessions(source,now,account)
         self.assertEqual(len(chars),1)
@@ -186,10 +186,10 @@ class BridgeTests(unittest.TestCase):
     def test_valid_full_name_session_is_kept(self):
         now=1800000100
         account='account-one'
-        source=('ForeverTraderDB = {\\n'
-                ' ["charactersWire"] = "FTCHAR1;1800000000|eu-2-110|Mage Pump|Alliance|500000|1800000000|1800000000|||||||",\\n'
-                ' ["sessionsWire"] = "FTSESSION1;eu-2-110:Mage_Pump:1800000000:1|eu-2-110|Mage Pump|1800000000|1800000050|400000|500000||",\\n'
-                '}\\n')
+        source=('ForeverTraderDB = {\n'
+                ' ["charactersWire"] = "FTCHAR1;1800000000|eu-2-110|Mage Pump|Alliance|500000|1800000000|1800000000|||||||",\n'
+                ' ["sessionsWire"] = "FTSESSION1;eu-2-110:Mage_Pump:1800000000:1|eu-2-110|Mage Pump|1800000000|1800000050|400000|500000||",\n'
+                '}\n')
         chars=characters.parse_saved_variables(source,now,account)
         sessions=v4_bridge.parse_sessions(source,now,account)
         usable,skipped=v4_bridge.compatible_sessions(chars,sessions,now)
