@@ -92,6 +92,18 @@ Zonder de omgevingsvariabelen is upload uitgeschakeld; zonder beschikbare VPS is
 - `tests/test_v4.py`, `tests/v4_mock.lua`, `tests/client_mock.lua`: regressietests.
 - `PREPARE-V4.bat`, `START-V4-BRIDGE.bat`, `INSTALL-V4-BRIDGE.bat`: Windows hulpmiddelen.
 
+## Market Desk (verifieerbare handelsinformatie)
+
+Na het bijwerken van de VPS en Windows open je met `DASHBOARD-V4.bat` een lokaal browserdashboard. De app haalt via HTTPS én Bearer-token twee beveiligde VPS-endpoints op: `/api/v4/strategies` (charactervoortgang + de exacte zoeklijst) en `/api/v4/research` (onderzoeksresultaten en de toestand van de uurlijkse marktsnapshot). De browser zelf krijgt **geen** toegangssleutel; de app draait alleen op `127.0.0.1`.
+
+Het nieuwe dashboard bevat:
+- **Bronstatus**: uurlijkse TK-snapshottijd, leeftijd, importfouten en aantal geprijsde items. Oudere snapshots dan 90 minuten zijn duidelijk als verouderd gemarkeerd.
+- **Kansenonderzoek**: bronvraagprijs per stuk in copper, historische mediaan van daadwerkelijk verzamelde uurprijzen (tot 14 dagen), geschatte/zo mogelijk bevestigde verkopen, laatste gemelde verkoopprijs, spreiding, theoretische referentie-uitstap en maximale koopindicatie. Als de historie te kort of verkoopindicatie te oud is, volgt **geen** sterk signaal. Filters op itemnaam/ID, signaalsterkte, historie, volume, theoretische marge en beschikbaar V4-zoekbudget.
+- **Exacte addonzoeklijst per character**: alle in WoW geladen item-ID's in volgorde, de bijbehorende publieke vraagprijs en laatst in WoW opgeslagen prijs waar beschikbaar.
+- **Zoekactiviteit**: de addon logt voortaan iedere automatische gerichte zoekopdracht en ieder volledig gemeten AH-resultaat (laagste prijs per stuk en prijsregels) in `v4SearchLog`. Het lokale dashboard leest deze log en bestaande gevalideerde `targetLog` **alleen-lezen** uit SavedVariables, met timestamp. Tijdens een lopende sessie zie je de directe voortgang in de game via `/ft auto status` en in de chat. Browserdata uit WoW worden pas actueel na `/reload` of uitloggen.
+
+**Belangrijke grenzen:** openbare vraagprijzen zijn geen transacties; vooral bij uitrusting is verkoopvolume een schatting. Externe vendorprijzen worden nergens in het kansenoverzicht gebruikt. De theoretische marge is **vóór deposit**, onbetaalde veilingen, prijsschommelingen en transactierisico. Dit dashboard geeft nadrukkelijk geen automatische koopautorisatie. De oude paperengine is geen bewijs van gerealiseerde winst. <https://auctionhouse.tk.gg/data/>
+
 ## Wat v4 bewust nog niet doet
 
 - Geen zelfstandige AH-aankopen of nieuwe veilingen plaatsen.
