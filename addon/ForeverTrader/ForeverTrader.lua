@@ -131,7 +131,12 @@ recordCharacter=function(reason)
         rec.mailAttachments=s.attachments or 0
     end
     d.characters[key]=rec
-    local function safe(v)return tostring(v or ''):gsub('[|;]','_'):gsub('%c','_'):gsub(string.char(34),'_'):gsub(string.char(92),'_') end
+    -- gsub returns (string,count); the extra value used to add a 15th
+    -- column to the export, which the Python importer (correctly) rejects.
+    local function safe(v)
+        local cleaned=tostring(v or ''):gsub('[|;]','_'):gsub('%c','_'):gsub(string.char(34),'_'):gsub(string.char(92),'_')
+        return cleaned
+    end
     local function sums(items)
         local rows={}
         if type(items)=='table' then
