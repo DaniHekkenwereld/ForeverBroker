@@ -711,7 +711,8 @@ SLASH_FOREVERTRADER1='/ft';SlashCmdList.FOREVERTRADER=function(msg)
                 ' | gear '..types(c.equipment)..
                 ' | bank '..(c.bankAt and types(c.bank) or 'nog niet gemeten'))
             if c.bankAt then
-                say('Bank laatst gezien: '..os.date('%d-%m %H:%M',c.bankAt)..
+                say('Bank laatst gezien: '..(type(date)=='function' and
+                    date('%d-%m %H:%M',c.bankAt) or tostring(c.bankAt))..
                     '. Oude bankgegevens blijven bewaard totdat je opnieuw scant.')
             else
                 say('Open de bank op dit character minstens één keer en log daarna uit.')
