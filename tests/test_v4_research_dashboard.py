@@ -51,6 +51,10 @@ class MarketResearchTests(unittest.TestCase):
                     mail_at=None,mail_pending=None,mail_ready=None,mail_attachments=None)
         with self.db:characters.store(self.db,[record])
         v4_engine.strategy_list(self.db,self.now,self.cfg)
+        # The test must commit before its HTTP thread reopens the same DB:
+        # otherwise the new manual-ledger schema migration correctly waits
+        # on this fixture's uncommitted SQLite writer.
+        self.db.commit()
 
     def tearDown(self):
         self.db.close()
