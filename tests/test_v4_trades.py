@@ -49,9 +49,9 @@ class TradeLedgerTests(unittest.TestCase):
         self.assertIsNone(state['recent_trades'][0]['realized_net_after_reported_cost'])
 
     def test_manual_trade_parser_rejects_tampered_and_future(self):
-        text=('ForeverTraderDB = {\\n'
+        text=('ForeverTraderDB = {\n'
               ' ["tradesWire"] = "FTTRADE1;eu-2-110_Mage_Pump_1800000000_1|'
-              'eu-2-110|Mage Pump|1800000000|BUY|12363|2|100000",\\n}')
+              'eu-2-110|Mage Pump|1800000000|BUY|12363|2|100000",\n}')
         rows=v4_bridge.parse_trades(text,1800000100,'account-one')
         self.assertEqual(len(rows),1)
         self.assertEqual(rows[0]['total_copper'],100000)
