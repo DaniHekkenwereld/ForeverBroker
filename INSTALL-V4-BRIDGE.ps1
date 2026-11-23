@@ -10,7 +10,9 @@ $trigger=New-ScheduledTaskTrigger -AtLogOn -User $user
 $principal=New-ScheduledTaskPrincipal -UserId $user -LogonType Interactive -RunLevel Limited
 $settings=New-ScheduledTaskSettingsSet -MultipleInstances IgnoreNew -ExecutionTimeLimit ([TimeSpan]::Zero) -StartWhenAvailable -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 2) -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
 Register-ScheduledTask -TaskName 'ForeverTrader-V4-Bridge' -Action $action -Trigger $trigger -Principal $principal -Settings $settings -Force | Out-Null
-Write-Host 'V4 bridge wordt automatisch gestart bij Windows-aanmelding.' -ForegroundColor Green
+# Start immediately as well: a scheduled logon trigger does not fire retroactively.
+Start-ScheduledTask -TaskName 'ForeverTrader-V4-Bridge'
+Write-Host 'V4 bridge gestart en ingesteld voor automatisch starten bij Windows-aanmelding.' -ForegroundColor Green
 Write-Host 'Als FT_V4_URL en FT_SYNC_TOKEN nog niet zijn ingesteld kan de bridge niet syncen.' -ForegroundColor Yellow
 Write-Host 'Handmatig starten: Start-ScheduledTask -TaskName ForeverTrader-V4-Bridge'
 Write-Host 'Log: data\logs\v4-bridge.log'
