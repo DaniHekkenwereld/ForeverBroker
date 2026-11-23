@@ -127,8 +127,13 @@ def build_character(character, market, market_t, clock, cfg, history=None,
         # If there is no signal, spend at most 5 searches collecting prices
         # on liquid goods instead of chasing 20 random, unactionable items.
         if not good:
-            good=[r for r in investment_candidates if
-                  (r.get('volume_24h') or 0)>=10 and not r.get('variant_risk')][:5]
+            # Only a handful of liquid/exact-ID research items. The historical
+            # data can then grow instead of sending empty plans to the client.
+            good=[r for r in investment_candidates
+                  if (r.get('volume_24h') or 0)>=3 and not r.get('variant_risk')][:5]
+        if not good:
+            good=[r for r in investment_candidates
+                  if not r.get('variant_risk') and _positive(r.get('ask'))][:5]
         rows=[{'id':r['id'],'name':r['name'],'ask':r['ask'],
                'vol24':r.get('volume_24h') or 0} for r in good[:MAX_PLAN_ITEMS]]
     ranked=[]
