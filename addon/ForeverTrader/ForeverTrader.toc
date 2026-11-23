@@ -1,7 +1,7 @@
 ## Interface: 16001
-## Title: ForeverTrader
-## Notes: Read-only trading coach, market plan, wallet and mailbox.
-## Version: 4.0.0
+## Title: ForeverTrader 1.0 Beta
+## Notes: Multi-character portfolio, bank, investments, intraday radar and verified AH search.
+## Version: 1.0.0-beta
 ## SavedVariables: ForeverTraderDB
 ## OptionalDeps: Auctionator
 Logic.lua
