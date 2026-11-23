@@ -2,6 +2,15 @@
 dofile('addon/ForeverTrader/V4.lua')
 local v=ForeverTraderV4
 local now=1800000000
+-- V4 read-only market queue stays valid for a full gameplay session.
+dofile('addon/ForeverTrader/Logic.lua')
+local logic=ForeverTraderLogic
+local longMonitor='FT3|eu-2-110|'..now..'|'..(now+86400)..';1111:0:0:0:0'
+local monitorPlan=logic.plan(longMonitor,now+21600)
+assert(monitorPlan and monitorPlan.rows[1].monitor,'24-hour read-only queue must survive 6 hours in WoW')
+local unsafePlan='FT3|eu-2-110|'..now..'|'..(now+86400)..';1111:100:1:200:0'
+assert(not logic.plan(unsafePlan,now),'24-hour actionable buy plan must be rejected')
+
 local p1='FT3|eu-2-110|1800000000|1800003600;1111:0:0:0:0'
 local p2='FT3|eu-2-110|1800000000|1800003600;2222:0:0:0:0'
 local db={v4PlanBlob='FT4!Forever#Mage?'..p1..'!Forever#Warrior?'..p2,
