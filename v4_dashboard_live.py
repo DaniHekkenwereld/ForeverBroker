@@ -48,7 +48,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         filters={key:args.get(key,[''])[0][:70] for key in ('q','sort','mode')}
         if filters['sort'] not in ('signal','discount','net','volume','name'):
             filters['sort']='signal'
-        if filters['mode'] not in ('all','interesting','history'):
+        if filters['mode'] not in ('all','budget','interesting','history'):
             filters['mode']='all'
         try:
             body=render_current(self.server.base,self.server.token,filters=filters)
