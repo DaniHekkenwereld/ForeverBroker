@@ -51,7 +51,6 @@ def validate(entry,clock):
 def store(db,entries,received,valid_keys):
     if type(entries) is not list or len(entries)>500:
         raise ValueError('Too many manual trades')
-    db.executescript(SCHEMA) if False else None  # schema installed by open_db
     added=0
     for record in entries:
         r=validate(record,received)
