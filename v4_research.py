@@ -9,6 +9,7 @@ import math
 
 import opportunities
 import trader
+import characters
 import v4_engine
 
 MARKET = 'eu-2-110'
@@ -34,7 +35,7 @@ def build(db, clock, cfg):
         'source':'auctionhouse.tk.gg', 'snapshot_at':None, 'received_at':None,
         'market_fresh':False, 'market_age_seconds':None,
         'market_items':0, 'priced_items':0, 'candidate_count':0,
-        'opportunities':[], 'lookup':{},
+        'opportunities':[], 'lookup':{},'budget_copper':None,'budget_character':None,
         'last_attempt':trader.getmeta(db,'market_attempt',0) or None,
         'last_error':trader.getmeta(db,'market_last_error','') or None,
     }
@@ -46,13 +47,25 @@ def build(db, clock, cfg):
                   market_fresh=0<=age<=MARKET_FRESH_SECONDS,
                   market_age_seconds=age,
                   market_items=len(market))
-    # A large budget here avoids hiding interesting listings from the report:
-    # the dashboard is research, not account-specific authorisation to buy.
-    # Never trust provider vendor values for deposit or vendor-flip math.
-    # The screener only uses theoretical seller spreads before deposits.
+    # Prioritise items the most recently seen Alliance character can
+    # actually afford within the conservative V4 5g research budget.
+    # This does not authorise a purchase.
+    funding=0
+    for char in characters.read_all(db):
+        wallet=char.get('gold')
+        wallet_at=char.get('wallet_at')
+        if (char.get('faction')=='Alliance' and type(wallet) is int and wallet>=0
+                and type(wallet_at) is int and 0<=clock-wallet_at<=7*86400):
+            funding=min(50000, int(wallet*.10),
+                        max(0,wallet-math.ceil(wallet*.20)))
+            result['budget_copper']=funding
+            result['budget_character']=char.get('character')
+            break
+    # Vendor values in external item databases are not game-verified.
+    # Never use them for estimates or implied vendor flips.
     no_vendor={i:{**x,'vendor':0} for i,x in market.items() if isinstance(x,dict)}
     ranked,coverage=opportunities.rank_market(
-        no_vendor,cfg,limit=300,budget_gold=1_000_000)
+        no_vendor,cfg,limit=300,budget_gold=max(1,funding/10000))
     result['priced_items']=coverage['priced']
     result['candidate_count']=coverage['spread_positive']
     # Historical data are populated by the existing VPS market importer only.
