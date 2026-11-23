@@ -8,6 +8,28 @@ import characters
 import trader
 import v4_engine as v4
 import v4_bridge
+import v4_dashboard_live
+
+
+class LiveDashboardTests(unittest.TestCase):
+    def test_reads_live_vps_strategy_without_exposing_token(self):
+        strategy={'version':'4.0.0','market':'eu-2-110','strategies':[
+            {'character':'Mage Pump','realm':'eu-2-110','gold':123000,
+             'market_fresh':True,'wallet_fresh':True,'market_t':1800000000,
+             'last_seen':1800000000,'plan':'FT3|eu-2-110|1800000000|1800086400;2589:0:0:0:0',
+             'actions':[]}]}
+        token='a-private-test-only-secret'
+        with patch.object(v4_dashboard_live.v4_bridge,'api_request',return_value=strategy) as fetch:
+            page=v4_dashboard_live.render_current('https://example.test',token,1800000020)
+        fetch.assert_called_once_with('https://example.test',token,'/api/v4/strategies')
+        self.assertIn('Mage Pump',page)
+        self.assertIn('http-equiv="refresh" content="30"',page)
+        self.assertNotIn(token,page)
+    def test_rejects_invalid_vps_market(self):
+        with patch.object(v4_dashboard_live.v4_bridge,'api_request',
+                          return_value={'version':'4.0.0','market':'wrong','strategies':[]}):
+            with self.assertRaises(ValueError):
+                v4_dashboard_live.render_current('https://example.test','token',1800000020)
 
 
 class V4EngineTests(unittest.TestCase):
