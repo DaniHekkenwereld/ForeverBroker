@@ -10,6 +10,7 @@ import statistics
 from collections import Counter
 
 import opportunities
+import v4_investing
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS v4_strategies (
@@ -62,9 +63,10 @@ def _target_and_margin(item,cfg):
         target=min(target,median)
     if target<=ask:
         return None
-    vendor=item.get('vendor')
-    deposit=math.ceil(max(0,vendor)*cfg.get('deposit_vendor_pct',15)/100) if type(vendor) is int else 0
-    net=target-math.ceil(target*cfg.get('cut_pct',5)/100)-deposit-ask
+    # Unverified public vendor values MUST NOT enter an investment suggestion.
+    # A real listing deposit must be verified in the client.
+    deposit=0
+    net=target-math.ceil(target*cfg.get('cut_pct',5)/100)-ask
     roi=net/ask*100
     return (target,net,roi,deposit) if net>0 else None
 
@@ -91,7 +93,8 @@ def summarize_history(db, ids, market_t, days=14):
     return result
 
 
-def build_character(character, market, market_t, clock, cfg, history=None):
+def build_character(character, market, market_t, clock, cfg, history=None,
+                    investment_candidates=None):
     """Return a versioned plan and contextual actions for one character.
 
     Ask/lastSoldP are external price indicators; evidence remains unverified.
@@ -113,7 +116,21 @@ def build_character(character, market, market_t, clock, cfg, history=None):
     # validated live performance permits a new, explicitly approved limit.
     allocated=min(available,50000)
     expires=clock+min(3600, max(300, market_t+5400-clock)) if fresh_market else clock+1800
-    rows,cov=opportunities.rank_market(market,cfg,limit=250,budget_gold=max(1,(money or 0)/10000))
+    no_vendor={i:{**x,'vendor':0} for i,x in market.items() if isinstance(x,dict)}
+    rows,cov=opportunities.rank_market(no_vendor,cfg,limit=250,budget_gold=1_000_000)
+    if investment_candidates is not None:
+        # Investment strategy controls which actual AH items are checked,
+        # never the biggest theoretical spread between two ASK listings.
+        good=[r for r in investment_candidates
+              if r.get('priority',99)<=5 and r.get('history_points_7d',0)>=8
+              and (r.get('volume_24h') or 0)>=5]
+        # If there is no signal, spend at most 5 searches collecting prices
+        # on liquid goods instead of chasing 20 random, unactionable items.
+        if not good:
+            good=[r for r in investment_candidates if
+                  (r.get('volume_24h') or 0)>=10 and not r.get('variant_risk')][:5]
+        rows=[{'id':r['id'],'name':r['name'],'ask':r['ask'],
+               'vol24':r.get('volume_24h') or 0} for r in good[:MAX_PLAN_ITEMS]]
     ranked=[]
     actions=[]
     # Prioritize inventory worth the most at today's ASK price, not low IDs.
@@ -179,9 +196,9 @@ def build_character(character, market, market_t, clock, cfg, history=None):
                                 historical_median=h.get('median'),
                                 reason='Historisch goedkoop; controleer live AH, exacte variant en verkoopbaarheid'))
         ranked.append(r)
-    # When no positive spread is reported, still offer liquid public items
-    # as read-only AH research targets. Never invent buy signals or prices.
-    if not ranked:
+    # Historical fallback only for direct/older build_character callers.
+    # Investment-driven plans must never silently switch to random listings.
+    if not ranked and investment_candidates is None:
         liquid=[]
         for item_id,x in market.items():
             if item_id in seen or not isinstance(x,dict) or not _positive(x.get('ask')):
@@ -252,10 +269,13 @@ def strategy_list(db, clock, cfg):
     for ch in chars:
         bags,listed=_stocks(ch)
         bag_ids.update(bags)
-    h=summarize_history(db,[r['id'] for r in ranked]+list(bag_ids),market_t)
+    investments=(v4_investing.analyze(db,market,market_t,cfg,clock)['investments']
+                 if market_t>0 else [])
+    h=summarize_history(db,[r['id'] for r in ranked]+list(bag_ids)+
+                        [r['id'] for r in investments],market_t)
     out=[]
     for char in chars:
-        s=build_character(char,market,market_t,clock,cfg,h)
+        s=build_character(char,market,market_t,clock,cfg,h,investments)
         save_strategy(db,s)
         out.append(s)
     return out
