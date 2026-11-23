@@ -45,9 +45,10 @@ function V.actions(d,realm,character,display)
     if not wire then return 0 end
     local count=0
     for part in wire:gmatch('[^,]+') do
-        local action,item,qty=part:match('^(%u[%u_]*):(%d+):(%d+)$')
+        local action,item,qty,maxBuy,target=part:match('^(%u[%u_]*):(%d+):(%d+):(%d+):(%d+)$')
+        if not action then action,item,qty=part:match('^(%u[%u_]*):(%d+):(%d+)$') end
         if action and item and qty and count<8 then
-            display(action,tonumber(item),tonumber(qty))
+            display(action,tonumber(item),tonumber(qty),tonumber(maxBuy),tonumber(target))
             count=count+1
         end
     end
