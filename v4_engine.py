@@ -179,6 +179,18 @@ def build_character(character, market, market_t, clock, cfg, history=None):
                                 historical_median=h.get('median'),
                                 reason='Historisch goedkoop; controleer live AH, exacte variant en verkoopbaarheid'))
         ranked.append(r)
+    # When no positive spread is reported, still offer liquid public items
+    # as read-only AH research targets. Never invent buy signals or prices.
+    if not ranked:
+        liquid=[]
+        for item_id,x in market.items():
+            if item_id in seen or not isinstance(x,dict) or not _positive(x.get('ask')):
+                continue
+            volume=x.get('vol24')
+            if type(volume) is int and volume>0:
+                liquid.append((volume,item_id))
+        liquid.sort(key=lambda pair:(-pair[0],pair[1]))
+        ranked=[{'id':item_id} for _,item_id in liquid[:MAX_PLAN_ITEMS]]
     # Keep scan queue read-only. A publicly observed spread cannot issue a
     # transaction: every row is explicitly max=qty=target=0.
     made=clock
