@@ -48,8 +48,11 @@ def build(db, clock, cfg):
                   market_items=len(market))
     # A large budget here avoids hiding interesting listings from the report:
     # the dashboard is research, not account-specific authorisation to buy.
+    # Never trust provider vendor values for deposit or vendor-flip math.
+    # The screener only uses theoretical seller spreads before deposits.
+    no_vendor={i:{**x,'vendor':0} for i,x in market.items() if isinstance(x,dict)}
     ranked,coverage=opportunities.rank_market(
-        market,cfg,limit=300,budget_gold=1_000_000)
+        no_vendor,cfg,limit=300,budget_gold=1_000_000)
     result['priced_items']=coverage['priced']
     result['candidate_count']=coverage['spread_positive']
     # Historical data are populated by the existing VPS market importer only.
