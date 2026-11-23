@@ -87,6 +87,44 @@ class HttpV4Tests(unittest.TestCase):
         self.assertEqual(plans[0]['realm'],'eu-2-110')
         self.assertEqual(plans[0]['character'],'Warrior Pump')
 
+    def test_portfolio_bank_and_gold_survive_authenticated_sync_roundtrip(self):
+        stamp=self.now
+        base={'realm':'eu-2-110','faction':'Alliance','last_seen':stamp,
+              'wallet_at':stamp,'bags_at':stamp,'auctions':{},'auctions_at':stamp,
+              'mail_at':None,'mail_pending':None,'mail_ready':None,
+              'mail_attachments':None}
+        warrior={**base,'character_key':'acct:eu-2-110:Warrior Pump',
+                 'character':'Warrior Pump','gold':2000000,
+                 'bags':{'14344':2},'bag_bound':{'14344':2},
+                 'bag_bound_at':stamp,'bank':{'12363':5,'16203':3},
+                 'bank_bound':{'16203':3},'bank_at':stamp,
+                 'equipment':{'18832':1},'equipment_at':stamp}
+        mage={**base,'character_key':'acct:eu-2-110:Mage Pump',
+              'character':'Mage Pump','gold':500000,'bags':{}}
+        accepted=self.req('/api/v4/sync','POST',{
+            'schema':'FT4SYNC1','characters':[warrior,mage],'sessions':[]})
+        self.assertTrue(accepted['ok'])
+        research=self.req('/api/v4/research')
+        p=research['portfolio']
+        self.assertEqual(p['gold_total_last_known'],2500000)
+        self.assertEqual(len(p['characters']),2)
+        owned={r['id']:r for r in p['holdings']}
+        self.assertEqual(owned[12363]['bank'],5)
+        self.assertEqual(owned[16203]['potentially_sellable'],0)
+        self.assertEqual(owned[14344]['bound_bags'],2)
+        self.assertEqual(owned[18832]['equipment'],1)
+        self.assertEqual(research['intraday']['patterns'],[])
+        # Updating a character without a new bank measurement must NOT erase it.
+        reduced={k:v for k,v in warrior.items() if k not in
+                ('bank','bank_bound','bank_at','equipment','equipment_at')}
+        self.assertTrue(self.req('/api/v4/sync','POST',{
+            'schema':'FT4SYNC1','characters':[reduced,mage],'sessions':[]})['ok'])
+        again=self.req('/api/v4/research')['portfolio']
+        self.assertEqual(next(i for i in again['holdings'] if i['id']==12363)['bank'],5)
+        with self.assertRaises(urllib.error.HTTPError) as err:
+            self.req('/api/v4/research',token='wrong')
+        self.assertEqual(err.exception.code,401)
+
     def test_authentication_is_mandatory(self):
         with self.assertRaises(urllib.error.HTTPError) as err:
             self.req('/api/v4/strategies',token='wrong')
