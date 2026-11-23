@@ -203,7 +203,6 @@ def store(db,rows):
 
 def read_all(db):
     import json
-    db.executescript(PORTFOLIO_SCHEMA)
     extra={r['character_key']:dict(r) for r in db.execute(
         'SELECT * FROM character_portfolio')}
     rows=[]
