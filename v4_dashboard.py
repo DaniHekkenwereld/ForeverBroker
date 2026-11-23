@@ -66,7 +66,7 @@ def plan_item_ids(plan):
     return ids[:30]
 
 
-def opportunity_rows(candidates,now,filters):
+def opportunity_rows(candidates,now,filters,budget=None):
     mode=filters.get('mode','all')
     sorting=filters.get('sort','signal')
     term=filters.get('q','').strip().lower()[:70]
@@ -74,6 +74,9 @@ def opportunity_rows(candidates,now,filters):
         candidates=[c for c in candidates if c.get('status')=='INTERESSANT — VERIFIËREN']
     elif mode=='history':
         candidates=[c for c in candidates if (c.get('history_days') or 0)>=3]
+    elif mode=='budget':
+        candidates=[c for c in candidates if type(budget) is int and
+                    type(c.get('ask')) is int and c['ask']<=budget]
     if term:
         candidates=[c for c in candidates if term in str(c.get('name','')).lower()
                     or term in str(c.get('id',''))]
@@ -247,12 +250,16 @@ def render(strategies,refreshed,research=None,activity=None,filters=None):
     opp=list(research.get('opportunities') or [])
     interesting=research.get('interesting_count',0)
     queue_items=sum(len(plan_item_ids(x.get('plan'))) for x in strategies)
+    budget=research.get('budget_copper')
+    if type(budget) is not int:budget=None
     ages=age(source_at,refreshed)
     metrics=[
         ('Marktsnapshot',ages,stamp(source_at)),
         ('Items in marktsnapshot',value(research.get('market_items')), 'EU PvP Alliance'),
         ('Kansen met historie',str(interesting),'Onderzoeken, geen koopopdracht'),
         ('AH-zoeklijst',str(queue_items)+' items',str(len(strategies))+' characters'),
+        ('Zoekbudget '+str(research.get('budget_character') or ''),money(budget),
+         'Max. 5g, 10% van gold en 20% reserve'),
         ('Game-prijzen opgeslagen',str(activity.get('saved_prices',0)),
          age(activity.get('saved_at'),refreshed)),
     ]
@@ -271,14 +278,15 @@ def render(strategies,refreshed,research=None,activity=None,filters=None):
     term=str(filters.get('q',''))[:70]
     mode=filters.get('mode','all')
     sort=filters.get('sort','signal')
-    select_mode=selectable('mode',mode,[('all','Alle signalen'),('interesting','Sterkere signalen'),('history','Minstens 3 dagen historie')])
+    select_mode=selectable('mode',mode,[('all','Alle signalen'),('budget','Binnen mijn zoekbudget'),
+                                      ('interesting','Sterkere signalen'),('history','Minstens 3 dagen historie')])
     select_sort=selectable('sort',sort,[('signal','Bewijs eerst'),('discount','Grootste historische korting'),
                                       ('net','Grootste theoretische marge'),('volume','Meeste geschatte verkopen'),
                                       ('name','Naam A-Z')])
     filters_html=('<form class="filters" method="get" action="/">'
                   '<input name="q" type="search" maxlength="70" placeholder="Zoek itemnaam of ID" value="'+escape(term)+'">'
                   +select_mode+select_sort+'<button type="submit">Toon resultaten</button></form>')
-    rows_count,rows=opportunity_rows(opp,refreshed,{'q':term,'mode':mode,'sort':sort})
+    rows_count,rows=opportunity_rows(opp,refreshed,{'q':term,'mode':mode,'sort':sort},budget)
     opp_html=('<div class="sectionhead"><div><h2>Marktkansen onderzoeken</h2>'
               '<p>VPS: uurlijkse vraagprijzen en historische marktdata. Dit is geen gegarandeerde verkoop of winst.</p></div>'
               '<small>'+str(rows_count)+' resultaten</small></div>'+
