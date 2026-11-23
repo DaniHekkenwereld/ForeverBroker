@@ -19,9 +19,16 @@ class LiveDashboardTests(unittest.TestCase):
              'last_seen':1800000000,'plan':'FT3|eu-2-110|1800000000|1800086400;2589:0:0:0:0',
              'actions':[]}]}
         token='a-private-test-only-secret'
-        with patch.object(v4_dashboard_live.v4_bridge,'api_request',return_value=strategy) as fetch:
+        research={'version':'4.0.0','market':'eu-2-110','market_fresh':True,
+                  'snapshot_at':1800000000,'opportunities':[]}
+        with patch.object(v4_dashboard_live.v4_bridge,'api_request',
+                          side_effect=[strategy,research]) as fetch, \
+             patch.object(v4_dashboard_live.v4_local_activity,'load',
+                          return_value={'notice':'Test save','saved_prices':0,'events':[]}):
             page=v4_dashboard_live.render_current('https://example.test',token,1800000020)
-        fetch.assert_called_once_with('https://example.test',token,'/api/v4/strategies')
+        self.assertEqual(fetch.call_count,2)
+        self.assertEqual(fetch.call_args_list[0].args[2],'/api/v4/strategies')
+        self.assertEqual(fetch.call_args_list[1].args[2],'/api/v4/research')
         self.assertIn('Mage Pump',page)
         self.assertIn('http-equiv="refresh" content="30"',page)
         self.assertNotIn(token,page)
