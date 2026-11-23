@@ -587,7 +587,15 @@ frame:SetScript('OnEvent',function(_,e,...)
                 V4.logout(db(),now(),s.walletKnown and s.cash or nil,bags)
             end
             recordCharacter('logout');s.loggingOut=true
-        elseif e=='BANKFRAME_OPENED' then bankOpen=true;getBank()
+        elseif e=='BANKFRAME_OPENED' then
+            bankOpen=true;getBank()
+            if s.bankKnown then
+                local types=0;for _ in pairs(bankStock) do types=types+1 end
+                say('Portfolio: bank opgeslagen ('..types..
+                    ' itemtypes). Deze wordt bij uitloggen naar de VPS gesynchroniseerd.')
+            else
+                say('Portfolio: bank nog niet uitleesbaar. Houd bank open en controleer /ft portfolio.')
+            end
         elseif e=='BANKFRAME_CLOSED' then getBank();bankOpen=false
         elseif e=='PLAYERBANKSLOTS_CHANGED' or e=='PLAYERBANKBAGSLOTS_CHANGED' then
             if bankOpen then getBank() end
@@ -686,6 +694,29 @@ SLASH_FOREVERTRADER1='/ft';SlashCmdList.FOREVERTRADER=function(msg)
                     '. Alleen echte transacties invoeren; uitloggen voor VPS-sync.')
                 wallet();recordCharacter('trade')
             else say('Transactie niet vastgelegd: '..tostring(err or 'V4 ontbreekt')) end
+        elseif msg=='portfolio' or msg=='bank' then
+            local realm,character=identity()
+            local c=realm and character and db().characters and
+                    db().characters[realm..'#'..character]
+            if not c then say('Portfolio: character nog niet geregistreerd.');return end
+            local function types(tab)
+                local count,units=0,0
+                for _,q in pairs(type(tab)=='table' and tab or {}) do
+                    count=count+1;units=units+q
+                end
+                return count..' itemtypes / '..units..' stuks'
+            end
+            say('Portfolio '..character..': '..goldExact(c.gold or 0)..
+                ' | tassen '..types(c.bags)..
+                ' | gear '..types(c.equipment)..
+                ' | bank '..(c.bankAt and types(c.bank) or 'nog niet gemeten'))
+            if c.bankAt then
+                say('Bank laatst gezien: '..os.date('%d-%m %H:%M',c.bankAt)..
+                    '. Oude bankgegevens blijven bewaard totdat je opnieuw scant.')
+            else
+                say('Open de bank op dit character minstens één keer en log daarna uit.')
+            end
+            say('Naar VPS: automatisch na /reload of uitloggen via de Windows-bridge.')
         elseif msg=='trades' then
             local d=db();say('Handmatige transacties in export: '..#(d.v4Trades or {})..
                 '. /ft trade buy [itemID] [aantal] [totaal g] of sell (netto na AH-fees).')
