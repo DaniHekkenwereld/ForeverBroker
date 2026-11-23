@@ -7,7 +7,10 @@ function GetMoney() return currentMoney end
 function UnitFactionGroup() return 'Alliance' end
 function GetCurrentRegion() return 3 end
 function GetRealmName() return 'Forever' end
-function UnitName() return 'Mage' end
+function UnitName() return 'Mage','Pump' end
+function GetUnitName() return 'Mage Pump' end
+function UnitFullName() return 'Mage','Pump' end
+function UnitGUID() return 'Player-1-MagePump' end
 function HasNewMail() return false end
 function GetItemInfo(i) return 'Item '..tostring(i) end
 UIParent={}; SlashCmdList={}
@@ -64,8 +67,8 @@ dofile('addon/ForeverTrader/V4.lua')
 dofile('addon/ForeverTrader/ForeverTrader.lua')
 fire('PLAYER_LOGIN')
 assert(type(ForeverTraderDB.characters)=='table','account-wide snapshot must exist')
-assert(ForeverTraderDB.characters['eu-2-110#Mage'].gold==500000,'gold captured on login')
-assert(ForeverTraderDB.charactersWire:find('eu-2-110|Mage|Alliance|500000',1,true),'bounded export should include mage')
+assert(ForeverTraderDB.characters['eu-2-110#Mage Pump'].gold==500000,'gold captured on login')
+assert(ForeverTraderDB.charactersWire:find('eu-2-110|Mage Pump|Alliance|500000',1,true),'bounded export should include mage')
 local firstRow=ForeverTraderDB.charactersWire:match('^FTCHAR1;([^;]+)')
 assert(firstRow and select(2,firstRow:gsub('|',''))==13,'character export must have exactly 14 columns')
 SlashCmdList.FOREVERTRADER('market')
@@ -125,24 +128,30 @@ clock=clock+30
 GetRealmName=function() return '' end
 GetNormalizedRealmName=function() return '' end
 GetCVar=function() return 'Pump' end
-UnitName=function() return 'Rogue' end
+UnitName=function() return 'Rogue','Pump' end
+GetUnitName=function() return 'Rogue Pump' end
+UnitFullName=function() return 'Rogue','Pump' end
+UnitGUID=function() return 'Player-2-RoguePump' end
 fire('PLAYER_LOGIN')
-assert(ForeverTraderDB.characters['eu-2-110#Rogue'],'market-scoped character should load without realm APIs')
+assert(ForeverTraderDB.characters['eu-2-110#Rogue Pump'],'full-name character should load without realm APIs')
 assert(ForeverTraderDB.v4ActiveSession,'automatic session should start without realm APIs')
 SlashCmdList.FOREVERTRADER('identity')
-assert(ForeverTraderDB.charactersWire:find('eu-2-110|Rogue|Alliance',1,true),'correct market must be exported')
+assert(ForeverTraderDB.charactersWire:find('eu-2-110|Rogue Pump|Alliance',1,true),'correct full name must be exported')
 fire('PLAYER_LOGOUT')
 
 -- If UnitName arrives late, PLAYER_ENTERING_WORLD recovers automatically.
-UnitName=function() return '' end
+UnitName=function() return '','' end
+GetUnitName=function() return '' end
+UnitFullName=function() return '','' end
 clock=clock+30
 fire('PLAYER_LOGIN')
 assert(ForeverTraderDB.v4ActiveSession==nil,'no anonymous session should be opened')
-UnitName=function() return 'Priest' end
+UnitName=function() return 'Priest','Falcon' end
+UnitFullName=function() return 'Priest','Falcon' end
 fire('PLAYER_ENTERING_WORLD')
-assert(ForeverTraderDB.characters['eu-2-110#Priest'],'world entry should recover character identity')
+assert(ForeverTraderDB.characters['eu-2-110#Priest Falcon'],'world entry should recover full name')
 assert(ForeverTraderDB.v4ActiveSession,'world entry should start the delayed session')
 fire('PLAYER_LOGOUT')
-assert(ForeverTraderDB.sessionsWire:find('|eu-2-110|Priest|',1,true),'sessions must use market-scoped realm')
+assert(ForeverTraderDB.sessionsWire:find('|eu-2-110|Priest Falcon|',1,true),'sessions must use full name')
 for _,v in ipairs(prints)do assert(not v:match('Fout:'),v)end
-realprint('Lua client mock: auto AH search, wallet/mail and automatic EU PvP Alliance identity OK')
+realprint('Lua client mock: auto AH search, wallet/mail and full first+surname identity OK')
