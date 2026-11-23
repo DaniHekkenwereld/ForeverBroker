@@ -27,7 +27,8 @@ import v4_server
 SESSION=re.compile(r'^\s*\["sessionsWire"\]\s*=\s*"([^"\\]{1,49000})"\s*,?\s*$',re.M)
 FT3=re.compile(r'^FT3\|eu-2-110\|\d+\|\d+;(?:\d+:0:0:0:0(?:;|$)){1,20}$')
 FIELD=re.compile(r'^([ \t]*)\["(v4PlanBlob|v4ActionsBlob)"\]\s*=\s*"[^"\\]*"\s*,?\s*$',re.M)
-ALLOWED_ACTION={'REVIEW_SELL','VERIFY_BUY','CHECK_LISTING','HOLD','WATCH'}
+ALLOWED_ACTION={'REVIEW_SELL','VERIFY_BUY','CHECK_LISTING','HOLD','WATCH',
+                'INVEST_SHORT','INVEST_LONG'}
 
 
 def base_url():
@@ -133,7 +134,14 @@ def make_blobs(strategies):
             if not isinstance(row,dict):continue
             kind=row.get('kind');item=row.get('id');qty=row.get('qty')
             if kind in ALLOWED_ACTION and type(item) is int and 0<item<10000000 and type(qty) is int and 0<qty<=10000:
-                decisions.append(f'{kind}:{item}:{qty}')
+                if kind in ('INVEST_SHORT','INVEST_LONG'):
+                    limit=row.get('max_buy_before_deposit')
+                    target=row.get('reference_sell')
+                    if (type(limit) is int and 0<limit<=100000000000 and
+                            type(target) is int and 0<target<=100000000000):
+                        decisions.append(f'{kind}:{item}:{qty}:{limit}:{target}')
+                else:
+                    decisions.append(f'{kind}:{item}:{qty}')
         item=key+'?'+code
         side=key+'?'+','.join(decisions)
         if sum(map(len,plans))+len(item)>56000 or sum(map(len,actions))+len(side)>56000:
