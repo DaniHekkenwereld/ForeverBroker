@@ -30,11 +30,11 @@ def render(report):
                     str(p['win_rate'])+'% gemeten winstgevende dagen</small></td>'+
                     '<td class="num">'+str(p['conservative_net_roi_pct'])+'%<small class="sub">excl. deposit</small></td></tr>')
     if rows:
-        table='<div class="tablewrap"><table><thead><tr>'+
+        table=('<div class="tablewrap"><table><thead><tr>'+
               ''.join('<th>'+x+'</th>' for x in ('Actie vandaag','Item','Instapvenster',
                       'Uitstapvenster','TK vraagprijs','Max instap*',
                       'Verkoopscenario*','Onderzochte dagen','25e percentiel ROI*'))+
-              '</tr></thead><tbody>'+''.join(rows)+'</tbody></table></div>'
+              '</tr></thead><tbody>'+''.join(rows)+'</tbody></table></div>')
     else:
         table=('<p>Er is nog geen herhaald dagpatroon dat aan de minimumvoorwaarden voldoet. '
                'We geven dus geen verzonnen advies zoals “8:00 kopen, 18:00 verkopen”.</p>')
