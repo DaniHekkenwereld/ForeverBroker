@@ -171,7 +171,7 @@ class BridgeTests(unittest.TestCase):
         now=1800000100
         account='482614058#1'
         source=('ForeverTraderDB = {\\n'
-                ' ["charactersWire"] = "FTCHAR1;1800000000|eu-2-110|Mage Pump|Alliance|500000|1800000000|1800000000|||0||||",\\n'
+                ' ["charactersWire"] = "FTCHAR1;1800000000|eu-2-110|Mage Pump|Alliance|500000|1800000000|1800000000|||||||",\\n'
                 ' ["sessionsWire"] = "FTSESSION1;eu-2-110:Mage:1800000000:1|eu-2-110|Mage|1800000000|1800000050|400000|500000||",\\n'
                 '}\\n')
         chars=characters.parse_saved_variables(source,now,account)
@@ -187,7 +187,7 @@ class BridgeTests(unittest.TestCase):
         now=1800000100
         account='account-one'
         source=('ForeverTraderDB = {\\n'
-                ' ["charactersWire"] = "FTCHAR1;1800000000|eu-2-110|Mage Pump|Alliance|500000|1800000000|1800000000|||0||||",\\n'
+                ' ["charactersWire"] = "FTCHAR1;1800000000|eu-2-110|Mage Pump|Alliance|500000|1800000000|1800000000|||||||",\\n'
                 ' ["sessionsWire"] = "FTSESSION1;eu-2-110:Mage_Pump:1800000000:1|eu-2-110|Mage Pump|1800000000|1800000050|400000|500000||",\\n'
                 '}\\n')
         chars=characters.parse_saved_variables(source,now,account)
