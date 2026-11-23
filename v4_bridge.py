@@ -224,6 +224,8 @@ def main():
         except Exception as e:
             print(time.strftime('%H:%M:%S'),'V4 bridge:',type(e).__name__,str(e)[:180],flush=True)
             last_try=time.time()
+            if a.once:
+                raise SystemExit(1)  # Propagate a failed one-shot sync to batch/PowerShell.
         if a.once:return
         time.sleep(max(10,a.poll))
 
