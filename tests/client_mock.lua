@@ -141,6 +141,7 @@ SlashCmdList.FOREVERTRADER('auto off')
 -- Reconnect after the old search timeout with a valid desktop trading plan.
 clock=clock+40
 ForeverTraderDB.v4PlanBlob='FT4!eu-2-110#Mage Pump?FT3|eu-2-110|'..clock..'|'..(clock+900)..';2589:140:10:200:0'
+ForeverTraderDB.v4ActionsBlob='FT4!eu-2-110#Mage Pump?INVEST_SHORT:2589:1:110:190'
 fire('PLAYER_LOGIN')
 SlashCmdList.FOREVERTRADER('start')
 fire('AUCTION_HOUSE_SHOW')
@@ -157,6 +158,12 @@ assert(C_AuctionHouse.searchCount==before+1,'pending search must not start a dup
 fire('ITEM_SEARCH_RESULTS_UPDATED',{itemID=2589})
 assert(ForeverTraderDB.v4SearchLog:find(':R:2589:100:1',1,true),
        'completed AH response must save actual copper/item and price rows')
+local verifiedEntry=false
+for _,line in ipairs(prints) do
+    if line:find('INSTAPPRIJS GEHAALD',1,true) and
+       line:find('1s 0c',1,true) then verifiedEntry=true end
+end
+assert(verifiedEntry,'in-game AH floor must be compared with the private VPS buy limit')
 SlashCmdList.FOREVERTRADER('auto status')
 assert(prints[#prints-1]:find('Laatste AH-resultaat',1,true),
        'auto status must show last real AH result')
