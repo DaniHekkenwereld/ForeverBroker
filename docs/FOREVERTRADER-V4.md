@@ -6,6 +6,16 @@ ForeverTrader v4 scheidt het 24/7 onderzoek (VPS) van het spelen in WoW (addon).
 
 De Windows-bridge is de enige component die met de VPS communiceert en SavedVariables kan openen. WoW-addons kunnen zelf geen netwerkverzoeken versturen. Dit systeem gebruikt géén game-memory reading, game input automation of verborgen dataverkeer.
 
+## Automatische marktidentiteit op WoW Forever
+
+De addon is voor **EU PvP Alliance** gebouwd en gebruikt voor character- en sessie-identiteit altijd de vaste publieke marktcode `eu-2-110`, zoals `eu-2-110#Character`. Dat is een **markt-ID, geen in-game realmnaam**.
+
+Sinds de Forever-clientwijzigingen in november 2026 kunnen `GetRealmName()` en vergelijkbare functies leeg of onbetrouwbaar zijn. De addon hangt daarom niet meer af van realmnaam-CVars, `/ft realm ...`, of handmatige `/ft market`-bevestiging. De addon leest zelf de characternaam, faction en regio. Alleen EU Alliance krijgt de live-AH-coach; het marktprofiel zelf is bewust vooraf geconfigureerd voor de specifieke Forever-installatie, niet via een onbetrouwbare realm API gedetecteerd.
+
+Oude characterobservaties met foutieve realm-labels worden voor hetzelfde Alliance-character zonder gegevensverlies naar de marktcode gemigreerd. Het sessiejournaal gebruikt dezelfde marktcode. De export heeft precies 14 velden per character; legacy-exports met foutieve structuur worden nooit stil als kooptransacties behandeld.
+
+**Een nieuwe pc:** de addon en Windows-bridge moeten eenmalig worden geïnstalleerd en gekoppeld, maar in WoW zijn geen realm- of marktcommando's nodig.
+
 ## De complete datastroom
 
 1. **Server 24/7**: `v4_server.py` leest met `legacy.parse_market` de publieke AH-data, volgens de bestaande API-pogingfrequentie (maximaal één per uur; :27 cadence bij opvolgende aanvragen). Opslag in de bestaande `data/paper/trader.sqlite` met `market_snapshots`, `price_history` en `import_log`; een kleine selectie krijgt extra detailhistorie. **Start NIET tegelijkertijd de oude desktop `START.bat` met dezelfde DB** als de server. De oude paper-engine heeft geen rol in live v4-advisering.
