@@ -18,7 +18,7 @@ Oude characterobservaties met foutieve realm-labels worden voor hetzelfde Allian
 
 ## De complete datastroom
 
-1. **Server 24/7**: `v4_server.py` leest met `legacy.parse_market` de publieke AH-data, volgens de bestaande API-pogingfrequentie (maximaal één per uur; :27 cadence bij opvolgende aanvragen). Opslag in de bestaande `data/paper/trader.sqlite` met `market_snapshots`, `price_history` en `import_log`; een kleine selectie krijgt extra detailhistorie. **Start NIET tegelijkertijd de oude desktop `START.bat` met dezelfde DB** als de server. De oude paper-engine heeft geen rol in live v4-advisering.
+1. **Server 24/7**: `v4_server.py` leest met `legacy.parse_market` de publieke AH-data, volgens de bestaande API-pogingfrequentie (maximaal één per uur; :27 cadence bij opvolgende aanvragen). Opslag in de V4-serverdatabase `data/v4/trader.sqlite` (standaard installatiescript) met `market_snapshots`, `price_history` en `import_log`; een kleine selectie krijgt extra detailhistorie. **Start NIET tegelijkertijd de oude desktop `START.bat` met dezelfde DB** als de server. De oude paper-engine heeft geen rol in live v4-advisering.
 2. **Characterposities**: de addon onthoudt accountbreed gold, tassen, eigen veilingen (wanneer AH geopend) en mailbox (wanneer mailbox geopend). Een tijdstempel per onderdeel maakt onderscheid tussen vers en oud. Oudere metingen overschrijven geen nieuwere.
 3. **Inloggen**: WoW leest zijn eigen SavedVariables. De addon selecteert uit `v4PlanBlob` de FT3-controlelijst voor precies het ingelogde `realm#character`. `/ft v4` toont tot acht serveraanbevelingen. `/ft auto on` kan AH-zoekopdrachten uitvoeren **bij een geopend AH**. De bijbehorende prijscontroles zijn geen koopautorisaties.
 4. **Tijdens spelen**: de addon gebruikt de actuele WoW-wallet, bag-inhoud, mail en AH-observaties; hij gebruikt de serverlijst als onderzoeksprioriteit. Deze WoW-data zijn actueler dan de laatste publieke snapshot. Geen automatische aankopen of postings.
@@ -28,7 +28,7 @@ Oude characterobservaties met foutieve realm-labels worden voor hetzelfde Allian
 
 ### Eén beperking die je moet weten
 
-De server kan na uitloggen verder rekenen. De **nieuwe planlijst komt echter pas effectief in de addon terecht als WoW de bijgewerkte SavedVariables opnieuw laadt**, doorgaans bij de volgende start van de game. Wanneer je in het characterselectiescherm wisselt zonder WoW af te sluiten, is geen tussentijdse strategiesynchronisatie mogelijk. Hiervoor zou een aparte live-koppeling nodig zijn. De addon kan tijdens één lange sessie wel actuele AH-prijzen blijven opvragen, maar ontvangt niet automatisch nieuwe serverplannen als hij al draait.
+De server kan na uitloggen verder rekenen. De V4-addon leest een **alleen-zoeken-lijst die 24 uur geldig kan blijven** zodat de AH-zoekfunctie tijdens een lange gamesessie niet vanzelf stilvalt. Dit is geen actueel koopadvies: de in-game AH-resultaten moeten steeds opnieuw worden gecontroleerd. De **nieuwe VPS-zoeklijst komt echter pas effectief in de addon terecht als WoW de bijgewerkte SavedVariables opnieuw laadt**, doorgaans bij de volgende start van de game. Wanneer je in het characterselectiescherm wisselt zonder WoW af te sluiten, is geen tussentijdse strategiesynchronisatie mogelijk. Hiervoor zou een aparte live-koppeling nodig zijn. De addon kan tijdens één lange sessie wel actuele AH-prijzen blijven opvragen, maar ontvangt niet automatisch nieuwe serverplannen als hij al draait.
 
 ## Strategie: wat wordt wél en niet geadviseerd?
 
@@ -78,7 +78,8 @@ De server haalt zelfstandig marktdata op, ongeacht de loginstatus van je charact
 
 3. Open een **nieuw** Windows-terminalvenster en gebruik `PREPARE-V4.bat`. Je ziet hoeveel characters en sessies naar de server zijn verzonden en hoeveel strategieën lokaal klaarstaan.
 4. Met `START-V4-BRIDGE.bat` blijft de bridge draaien. Gebruik voor automatisch opstarten bij Windows-aanmelding `INSTALL-V4-BRIDGE.bat` (Taakplanner). Log: `data/logs/v4-bridge.log`.
-5. **Sluit WoW volledig** voordat je voor het eerst een nieuwe serverstrategie ophaalt, en start WoW daarna weer. Gebruik in-game `/ft v4`, `/ft start` en eventueel `/ft auto on` aan het AH.
+5. **Sluit WoW volledig** voordat je voor het eerst een nieuwe serverstrategie ophaalt, en start WoW daarna weer. Bij een geopend AH is `/ft auto on` voldoende om de zoeklijst te starten; `/ft auto status` toont mogelijke blokkades. Gebruik `/ft v4` voor de serveradviezen. Handmatig plakken is niet nodig.
+6. **Live desktopdashboard**: start `DASHBOARD-V4.bat` op Windows. Dit opent een beveiligd lokaal browserdashboard en vraagt elke 30 seconden nieuwe strategieën op bij de VPS. Het dashboard is echt live met de VPS; de in-game addon kan die nieuwe gegevens niet tussentijds ophalen.
 
 Zonder de omgevingsvariabelen is upload uitgeschakeld; zonder beschikbare VPS is v4 nog niet end-to-end actief. De Win-bridge mag blijven draaien zonder WoW maar de pc moet aanstaan voor de tussentijdse gegevensoverdracht.
 
