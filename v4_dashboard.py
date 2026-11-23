@@ -9,6 +9,8 @@ import os
 import pathlib
 import tempfile
 import v4_investing_ui
+import v4_portfolio_ui
+import v4_daily_ui
 
 
 def escape(value):
@@ -297,6 +299,8 @@ def render(strategies,refreshed,research=None,activity=None,filters=None):
                   '<input name="q" type="search" maxlength="70" placeholder="Zoek itemnaam of ID" value="'+escape(term)+'">'
                   +select_focus+select_mode+select_sort+'<button type="submit">Toon resultaten</button></form>')
     rows_count,rows=opportunity_rows(opp,refreshed,{'q':term,'mode':mode,'sort':sort},budget)
+    portfolio_html=v4_portfolio_ui.render(research.get('portfolio'),refreshed,filters)
+    daily_html=v4_daily_ui.render(research.get('intraday'))
     invest_html=filters_html+v4_investing_ui.render(research,refreshed,
                       {'q':term,'focus':focus,'sort':sort},budget)
     opp_html=('<div class="sectionhead"><div><h2>Marktkansen onderzoeken</h2>'
@@ -327,10 +331,13 @@ def render(strategies,refreshed,research=None,activity=None,filters=None):
             '<meta name="viewport" content="width=device-width,initial-scale=1">'
             '<title>ForeverTrader · Market Desk</title><style>'+CSS+'</style></head><body>'
             '<main><div class="top"><div><div class="eyebrow">FOREVERTRADER / V4</div>'
-            '<h1>Market Desk</h1><p>EU PvP Alliance · echte bronnen, controleerbare kansen, zicht op AH-zoekactiviteit</p></div>'
+            '<h1>ForeverTrader 1.0 Beta · Portfolio &amp; Trading Desk</h1>'+
+            '<p>EU PvP Alliance · gold en items van alle characters · daghandel · lange termijn · verifieerbare AH-data</p></div>'
             '<div class="source">Bron: <a href="https://auctionhouse.tk.gg/data/" target="_blank" '
             'rel="noopener noreferrer">TK Auction House</a> · '+escape(stamp(source_at))+'</div></div>'
             '<div class="metrics">'+cards+'</div>'+warnings+
+            '<section>'+portfolio_html+'</section>'+
+            '<section>'+daily_html+'</section>'+
             '<section>'+invest_html+'</section>'+
             '<section>'+opp_html+'</section>'+
             '<section>'+queue_html+'</section>'+
