@@ -149,7 +149,7 @@ class BridgeTests(unittest.TestCase):
         orphan=':100:1||Mage|100|200|1000|1500||'
         valid='Forever:Mage:101:2|Forever|Mage|101|200|1000|1500||'
         wire='FTSESSION1;'+orphan+';'+valid
-        source='ForeverTraderDB = {\\n  ["sessionsWire"] = "'+wire+'",\\n}\\n'
+        source='ForeverTraderDB = {\n  ["sessionsWire"] = "'+wire+'",\n}\n'
         rows=v4_bridge.parse_sessions(source,200,'account-a')
         self.assertEqual(len(rows),1)
         self.assertEqual(rows[0]['character_key'].split(':')[-2:],['Forever','Mage'])
@@ -157,7 +157,7 @@ class BridgeTests(unittest.TestCase):
 
     def test_only_incomplete_sessions_are_skipped(self):
         orphan='Forever::100:1|Forever||100|200|1000|1500||'
-        source='ForeverTraderDB = {\\n  ["sessionsWire"] = "FTSESSION1;'+orphan+'",\\n}\\n'
+        source='ForeverTraderDB = {\n  ["sessionsWire"] = "FTSESSION1;'+orphan+'",\n}\n'
         self.assertEqual(v4_bridge.parse_sessions(source,200,'account-a'),[])
 
     def test_session_wire_parser(self):
