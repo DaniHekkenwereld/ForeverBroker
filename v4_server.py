@@ -147,6 +147,16 @@ class Handler(BaseHTTPRequestHandler):
         if path.path!='/api/v4/sync' or path.query:
             return self.respond(404,{'error':'Not found'})
         if not self.authorized():
+            # Drain a small unauthorized POST body before closing the socket.
+            # Otherwise Windows can see TCP RST instead of HTTP 401 because
+            # the server closes with unread inbound request bytes.
+            try:
+                unauthorized_length=int(self.headers.get('Content-Length','0'))
+                if 0<unauthorized_length<=MAX_BODY:
+                    self.connection.settimeout(2)
+                    self.rfile.read(unauthorized_length)
+            except (OSError,ValueError,OverflowError):
+                pass
             return self.respond(401,{'error':'Unauthorized'})
         try:
             length=int(self.headers.get('Content-Length','0'))
