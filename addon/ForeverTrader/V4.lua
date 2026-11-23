@@ -55,6 +55,41 @@ function V.actions(d,realm,character,display)
     return count
 end
 
+-- Manual trade record only: the player must have actually bought/sold.
+-- Seller proceeds must be NET gold received after AH fees. Never guess fills.
+function V.recordTrade(d,clock,realm,character,side,item,qty,total)
+    if type(d)~='table' or type(clock)~='number' or clock<=0 or
+       type(realm)~='string' or type(character)~='string' or
+       side~='BUY' and side~='SELL' or
+       type(item)~='number' or item<=0 or item>10000000 or item~=math.floor(item) or
+       type(qty)~='number' or qty<=0 or qty>100000 or qty~=math.floor(qty) or
+       type(total)~='number' or total<=0 or total>9007199254740991 or
+       total~=math.floor(total) then return nil,'Ongeldige handel' end
+    if realm:find('[|;]') or character:find('[|;]') then return nil,'Ongeldige identiteit' end
+    local safeID=(realm..'_'..character):gsub('[^%w_.:-]','_')
+    d.v4TradeSeq=(tonumber(d.v4TradeSeq) or 0)+1
+    local tradeID=safeID..'_'..math.floor(clock)..'_'..math.floor(d.v4TradeSeq)
+    d.v4Trades=type(d.v4Trades)=='table' and d.v4Trades or {}
+    d.v4Trades[#d.v4Trades+1]={tradeID,realm,character,
+                               math.floor(clock),side,math.floor(item),
+                               math.floor(qty),math.floor(total)}
+    while #d.v4Trades>250 do table.remove(d.v4Trades,1) end
+    local output={'FTTRADE1'}
+    local bytes=8
+    for _,row in ipairs(d.v4Trades) do
+        if type(row)=='table' and #row==8 then
+            local fields={}
+            for j=1,8 do fields[j]=clean(row[j]) end
+            local line=table.concat(fields,'|')
+            if bytes+#line+1<=59000 then
+                output[#output+1]=line;bytes=bytes+#line+1
+            end
+        end
+    end
+    d.tradesWire=table.concat(output,';')
+    return tradeID
+end
+
 local function wireSessions(d)
     local list={}
     for _,row in pairs(d.v4Sessions or {}) do
