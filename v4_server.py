@@ -18,6 +18,7 @@ import characters
 import legacy
 import trader
 import v4_engine as v4
+import v4_research
 
 MAX_BODY=300000
 UTC=dt.timezone.utc
@@ -126,7 +127,7 @@ class Handler(BaseHTTPRequestHandler):
         path=urlsplit(self.path)
         if path.path=='/health' and not path.query:
             return self.respond(200,{'ok':True,'version':'4.0.0'})
-        if path.path!='/api/v4/strategies' or path.query:
+        if path.path not in ('/api/v4/strategies','/api/v4/research') or path.query:
             return self.respond(404,{'error':'Not found'})
         if not self.authorized():
             return self.respond(401,{'error':'Unauthorized'})
@@ -134,11 +135,17 @@ class Handler(BaseHTTPRequestHandler):
         try:
             db=open_db(self.server.db_path)
             try:
-                with db:
-                    plans=v4.strategy_list(db,now,self.server.cfg)
+                if path.path=='/api/v4/research':
+                    # No external HTTP requests here; use cached local snapshots.
+                    report=v4_research.build(db,now,self.server.cfg)
+                else:
+                    with db:
+                        plans=v4.strategy_list(db,now,self.server.cfg)
             finally:db.close()
-        except (sqlite3.Error,ValueError) as e:
-            return self.respond(503,{'error':'Strategy unavailable'})
+        except (sqlite3.Error,ValueError,TypeError,KeyError,OverflowError):
+            return self.respond(503,{'error':'Research unavailable'})
+        if path.path=='/api/v4/research':
+            return self.respond(200,report)
         return self.respond(200,{'version':'4.0.0','generated_at':now,
                                  'market':v4.MARKET,'strategies':plans})
 
