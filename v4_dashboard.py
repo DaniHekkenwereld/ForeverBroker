@@ -8,6 +8,7 @@ import html
 import os
 import pathlib
 import tempfile
+import v4_investing_ui
 
 
 def escape(value):
@@ -256,10 +257,14 @@ def render(strategies,refreshed,research=None,activity=None,filters=None):
     metrics=[
         ('Marktsnapshot',ages,stamp(source_at)),
         ('Items in marktsnapshot',value(research.get('market_items')), 'EU PvP Alliance'),
-        ('Kansen met historie',str(interesting),'Onderzoeken, geen koopopdracht'),
+        ('Investeringssignalen',str(research.get('shortlist_count',0)),'Korte en lange termijn'),
+        ('Stijgende items',str(research.get('rising_count',0)),'Binnen onderzochte artikelen'),
+        ('Dalende items',str(research.get('falling_count',0)),'Binnen onderzochte artikelen'),
+        ('7d goederenmandje',v4_investing_ui.change(research.get('basket_change_7d_pct')) if fresh else 'Verouderd',
+         str(research.get('basket_item_count',0))+' liquide goederen; geen algemene goldinflatie'),
         ('AH-zoeklijst',str(queue_items)+' items',str(len(strategies))+' characters'),
-        ('Zoekbudget '+str(research.get('budget_character') or ''),money(budget),
-         'Max. 5g, 10% van gold en 20% reserve'),
+        ('Indicatieve per-item limiet '+str(research.get('budget_character') or ''),money(budget),
+         '20% van bekende gold, geen automatisch investeringsbudget'),
         ('Game-prijzen opgeslagen',str(activity.get('saved_prices',0)),
          age(activity.get('saved_at'),refreshed)),
     ]
@@ -277,16 +282,23 @@ def render(strategies,refreshed,research=None,activity=None,filters=None):
     warnings=''.join('<div class="warning'+(' error' if not fresh else '')+'">'+escape(e)+'</div>' for e in errors)
     term=str(filters.get('q',''))[:70]
     mode=filters.get('mode','all')
+    focus=filters.get('focus','all')
     sort=filters.get('sort','signal')
+    select_focus=selectable('focus',focus,[('all','Alle investeringen'),('short','Korte termijn'),
+            ('long','Lange termijn'),('rising','Prijs stijgt'),('falling','Prijs daalt'),
+            ('dips','Koopdips'),('budget','Binnen limiet')])
     select_mode=selectable('mode',mode,[('all','Alle signalen'),('budget','Binnen mijn zoekbudget'),
                                       ('interesting','Sterkere signalen'),('history','Minstens 3 dagen historie')])
     select_sort=selectable('sort',sort,[('signal','Bewijs eerst'),('discount','Grootste historische korting'),
                                       ('net','Grootste theoretische marge'),('volume','Meeste geschatte verkopen'),
-                                      ('name','Naam A-Z')])
+                                      ('name','Naam A-Z'),('momentum24','Sterkste stijging 24u'),
+                                      ('momentum7','Sterkste stijging 7d')])
     filters_html=('<form class="filters" method="get" action="/">'
                   '<input name="q" type="search" maxlength="70" placeholder="Zoek itemnaam of ID" value="'+escape(term)+'">'
-                  +select_mode+select_sort+'<button type="submit">Toon resultaten</button></form>')
+                  +select_focus+select_mode+select_sort+'<button type="submit">Toon resultaten</button></form>')
     rows_count,rows=opportunity_rows(opp,refreshed,{'q':term,'mode':mode,'sort':sort},budget)
+    invest_html=filters_html+v4_investing_ui.render(research,refreshed,
+                      {'q':term,'focus':focus,'sort':sort},budget)
     opp_html=('<div class="sectionhead"><div><h2>Marktkansen onderzoeken</h2>'
               '<p>VPS: uurlijkse vraagprijzen en historische marktdata. Dit is geen gegarandeerde verkoop of winst.</p></div>'
               '<small>'+str(rows_count)+' resultaten</small></div>'+
@@ -319,6 +331,7 @@ def render(strategies,refreshed,research=None,activity=None,filters=None):
             '<div class="source">Bron: <a href="https://auctionhouse.tk.gg/data/" target="_blank" '
             'rel="noopener noreferrer">TK Auction House</a> · '+escape(stamp(source_at))+'</div></div>'
             '<div class="metrics">'+cards+'</div>'+warnings+
+            '<section>'+invest_html+'</section>'+
             '<section>'+opp_html+'</section>'+
             '<section>'+queue_html+'</section>'+
             '<section>'+scans_html+'</section>'+
