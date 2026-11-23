@@ -22,9 +22,12 @@ v.login(db,now,'Forever','Mage',100000,{[2589]=20})
 assert(db.v4ActiveSession)
 v.logout(db,now+3600,130000,{[2589]=10,[1111]=1})
 assert(db.sessionsWire:find('FTSESSION1;',1,true),'must export session on logout')
+assert(db.sessionsWire:find('|eu-2-110|Mage|',1,true),'sessions use canonical market, never raw realm')
 assert(db.sessionsWire:find('100000|130000|2589:20|1111:1,2589:10',1,true),
        'session must capture observed wallet and bag differences')
+db.v4Sessions.orphan={id='orphan',realm='',character='',started=now,ended=now+1}
 local previous=db.sessionsWire
 v.logout(db,now+3601,120000,{})
 assert(db.sessionsWire==previous,'second logout must not double-create session')
+assert(not db.sessionsWire:find('orphan',1,true),'orphaned legacy session must be excluded')
 print('V4 addon unit tests PASS')
