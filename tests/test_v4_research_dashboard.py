@@ -1,7 +1,12 @@
 """Regressions: market research must label evidence and dashboard must be honest."""
+import json
 import pathlib
 import tempfile
+import threading
+import urllib.error
+import urllib.request
 import unittest
+from http.server import ThreadingHTTPServer
 from unittest.mock import patch
 
 import characters
@@ -10,6 +15,7 @@ import v4_dashboard
 import v4_engine
 import v4_local_activity
 import v4_research
+import v4_server
 
 
 class MarketResearchTests(unittest.TestCase):
@@ -67,6 +73,32 @@ class MarketResearchTests(unittest.TestCase):
         # A huge stale vendor price must not suppress ranking or invent profit.
         self.assertNotIn('vendor',row)
         self.assertIn('1111',report['lookup'])
+
+
+    def test_authenticated_research_api_end_to_end(self):
+        token='only-a-test-token-that-is-long-enough-for-unit-testing'
+        with ThreadingHTTPServer(('127.0.0.1',0),v4_server.Handler) as server:
+            server.sync_token=token
+            server.db_path=str(pathlib.Path(self.tmp.name)/'v4.sqlite')
+            server.cfg=self.cfg
+            worker=threading.Thread(target=server.serve_forever,daemon=True)
+            worker.start()
+            try:
+                url=f'http://127.0.0.1:{server.server_port}/api/v4/research'
+                with self.assertRaises(urllib.error.HTTPError) as ctx:
+                    urllib.request.urlopen(url,timeout=5)
+                self.assertEqual(ctx.exception.code,401)
+                req=urllib.request.Request(
+                    url,headers={'Authorization':'Bearer '+token})
+                with urllib.request.urlopen(req,timeout=5) as response:
+                    self.assertEqual(response.status,200)
+                    report=json.load(response)
+                self.assertEqual(report['snapshot_at'],self.now)
+                self.assertEqual(report['market'],'eu-2-110')
+                self.assertTrue(any(x['id']==1111 for x in report['opportunities']))
+            finally:
+                server.shutdown()
+                worker.join(timeout=3)
 
     def test_stale_snapshot_is_not_presented_as_current_opportunity(self):
         report=v4_research.build(self.db,self.now+6000,self.cfg)
