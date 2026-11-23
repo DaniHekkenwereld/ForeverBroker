@@ -121,6 +121,13 @@ def build(db,market,market_t,clock,cfg,investments=None):
                 obj['bound_known']=False
             if bank.get(item) and ch.get('bank_bound') is None:
                 obj['bound_known']=False
+            if bags.get(item) and (not fresh(ch.get('bags_at'),clock,7*86400)
+                                  or (ch.get('bag_bound_at') or 0)<(ch.get('bags_at') or 0)):
+                obj['bound_known']=False
+            if bank.get(item) and not fresh(ch.get('bank_at'),clock,7*86400):
+                obj['bound_known']=False
+            if auctions.get(item) and not fresh(ch.get('auctions_at'),clock,7*86400):
+                obj['bound_known']=False
             obj['holders'].append({
                 'character':game,'bags':bags.get(item,0),'bank':bank.get(item,0),
                 'auctions':auctions.get(item,0),'equipment':equipment.get(item,0),
