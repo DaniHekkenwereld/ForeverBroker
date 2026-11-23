@@ -245,8 +245,22 @@ def sync_once(prepared_only=False):
     if skipped:
         print('V4: '+str(skipped)+' oude sessie(s) met afwijkende naam/markt overgeslagen; origineel bewaard.',flush=True)
     if chars or sessions:
-        response=api_request(base,token,'/api/v4/sync',
-                             {'schema':'FT4SYNC1','characters':chars,'sessions':sessions})
+        payload={'schema':'FT4SYNC1','characters':chars,'sessions':sessions}
+        try:
+            response=api_request(base,token,'/api/v4/sync',payload)
+        except ValueError as exc:
+            # If a legacy session slips through and the VPS rejects this
+            # atomic batch, try a CHARACTER-ONLY upload once. The client
+            # must never sacrifice correct current gold/bags/auctions because
+            # of a previous addon build's bad session identity.
+            if chars and sessions and '/api/v4/sync HTTP 400' in str(exc):
+                response=api_request(base,token,'/api/v4/sync',
+                                     {'schema':'FT4SYNC1','characters':chars,'sessions':[]})
+                print('V4: sessiebatch geweigerd; charactergegevens apart gesynchroniseerd. '
+                      'De originele sessies blijven bewaard.',flush=True)
+                sessions=[]
+            else:
+                raise
         if response.get('ok') is not True:raise ValueError('Server bevestigde sync niet')
     strategy=api_request(base,token,'/api/v4/strategies')
     if strategy.get('version')!='4.0.0' or strategy.get('market')!='eu-2-110':
