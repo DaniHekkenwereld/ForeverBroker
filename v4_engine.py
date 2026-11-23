@@ -138,6 +138,23 @@ def build_character(character, market, market_t, clock, cfg, history=None,
                'vol24':r.get('volume_24h') or 0} for r in good[:MAX_PLAN_ITEMS]]
     ranked=[]
     actions=[]
+    # Explicit investment review, not automatic buy authorisation.
+    if investment_candidates and fresh_market:
+        for inv in investment_candidates:
+            code=inv.get('signal') or ''
+            if not code.startswith(('KORT','LANG')):continue
+            item_id=inv['id'];cost=inv['ask']
+            if item_id in bags or item_id in listed:continue
+            if not fresh_wallet or cost>min(available,int(money*.20)):continue
+            limit=inv.get('max_buy_before_deposit')
+            exit_price=inv.get('exit_scenario')
+            if not (_positive(limit) and _positive(exit_price)) or cost>limit:continue
+            actions.append(dict(kind=('INVEST_SHORT' if code.startswith('KORT') else 'INVEST_LONG'),
+                                id=item_id,name=inv['name'],qty=1,
+                                max_buy_before_deposit=limit,reference_sell=exit_price,
+                                market_ask=cost,horizon=inv.get('horizon'),
+                                reason=inv.get('warning') or 'Controleer de AH-prijs en variant'))
+            if len(actions)>=8:break
     # Prioritize inventory worth the most at today's ASK price, not low IDs.
     owned_items=sorted(bags.items(),key=lambda pair:(
         -((market.get(pair[0]) or {}).get('ask') or 0)*pair[1],pair[0]))
@@ -225,9 +242,10 @@ def build_character(character, market, market_t, clock, cfg, history=None,
     if not ranked:
         plan=''
     actions.sort(key=lambda a: (
-        0 if a['kind']=='REVIEW_SELL' else
-        1 if a['kind']=='VERIFY_BUY' else
-        2 if a['kind']=='CHECK_LISTING' else 3,
+        0 if a['kind'] in ('INVEST_SHORT','INVEST_LONG') else
+        1 if a['kind']=='REVIEW_SELL' else
+        2 if a['kind']=='VERIFY_BUY' else
+        3 if a['kind']=='CHECK_LISTING' else 4,
         -a.get('model_net',0), a['id']))
     summary=dict(
         version='4.0.0', character_key=key,realm=character['realm'],
