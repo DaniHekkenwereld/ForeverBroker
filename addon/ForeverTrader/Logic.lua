@@ -8,16 +8,20 @@ function L.plan(text,now)
     local h,body=text:match('^(FT3|eu%-2%-110|%d+|%d+);(.*)$')
     if not h then return nil,'Verkeerde markt of formaat. Kopieer alleen de volledige FT3-regel.' end
     local made,expires=h:match('(%d+)|(%d+)$'); made,expires=tonumber(made),tonumber(expires)
-    if made>now+60 or expires<=now or expires<=made or expires-made>7200 then return nil,'Planning verlopen of ongeldige tijd' end
+    if made>now+60 or expires<=now or expires<=made or expires-made>86400 then return nil,'Planning verlopen of ongeldige tijd' end
     local list,seen={},{}
+    local monitorOnly=true
     for row in body:gmatch('[^;]+') do
         local i,p,q,s,hold=row:match('^(%d+):(%d+):(%d+):(%d+):(%d+)$')
         i,p,q,s,hold=tonumber(i),tonumber(p),tonumber(q),tonumber(s),tonumber(hold)
         local monitor=i and i>0 and p==0 and q==0 and s==0 and hold==0
         local validBuy=i and i>0 and p and p>0 and q and q>0 and q<=10000 and s and s>p and hold and hold<=168 and p<=100000000 and s<=100000000
         if (not monitor and not validBuy) or seen[i] or #list>=30 then return nil,'Ongeldige planregel' end
+        if not monitor then monitorOnly=false end
         seen[i]=true; list[#list+1]={id=i,max=p,qty=q,target=s,hold=hold,monitor=monitor}
     end
+    -- Long-lived queues are search-only; reject stale executable trading plans.
+    if expires-made>7200 and not monitorOnly then return nil,'Verlopen handelsadvies' end
     return {made=made,expires=expires,rows=list}
 end
 function L.next(s,now)
@@ -39,7 +43,7 @@ function L.next(s,now)
     if not s.targetMode and (not s.scanAt or now-s.scanAt>=900) then return 'SCAN','Doe een Full Scan met Auctionator als de server dit toestaat.' end
     if s.sellCount>0 then return 'SELL','Controleer verkoopadvies en plaats de geselecteerde items zelf.' end
     if s.buyCount>0 then return 'BUY','Controleer actuele stackprijs en koop zelf de geselecteerde items.' end
-    if not s.planValid then return 'PLAN','Plak een actuele planning uit het desktopdashboard via /ft plan.' end
+    if not s.planValid then return 'PLAN','V4-zoeklijst niet beschikbaar; Windows-bridge synchroniseert bij volgende WoW-start.' end
     if s.searchCandidate then return 'SEARCH','Klik Zoek volgend om de actuele orderboekprijs te controleren.' end
     if s.targetMode and (not s.scanAt or now-s.scanAt>=900) then return 'SCAN','Doe een Full Scan met Auctionator als de server dit toestaat.' end
     return 'WAIT','Geen passende actie. Wacht op nieuw mail-signaal of volgende scan.'
