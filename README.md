@@ -2,6 +2,20 @@
 
 ForeverTrader **v4.0.0** — centrale 24/7 AH-server, per-character handelsstrategie en WoW-addon voor WoW Forever EU PvP Alliance. De oudere paper-tradingengine blijft apart beschikbaar.
 
+## Ubuntu 26 VPS: installatie met één script
+
+Op een **frisse Ubuntu VPS** met Python 3.11+ en sudo, log in als de gewone SSH-gebruiker:
+
+```bash
+git clone https://github.com/DaniHekkenwereld/ForeverBroker.git ~/ForeverBroker
+cd ~/ForeverBroker
+bash deploy/INSTALL-V4-SERVER.sh
+```
+
+Het script compileert de Python-code, draait de regressietests en **stopt bij fouten**. Bij succes maakt het een unieke geheime token aan in `/etc/forevertrader/v4.env`, installeert de `forevertrader-v4`-systemd-service onder de ingelogde gebruiker en controleert lokaal `http://127.0.0.1:8765/health`.
+
+**Beveiliging:** dit maakt nog geen openbare verbinding. De API blijft op `127.0.0.1:8765`; voor de Windows-bridge moet er daarna eerst een werkende HTTPS-verbinding komen. De token nooit in GitHub of chat plakken.
+
 ## ForeverTrader V4: server denkt, addon handelt wanneer je speelt
 
 De v4-server verzamelt onafhankelijk van WoW elk uur de openbare marktprijzen en bouwt historie op. Hij bewaart de laatst gesynchroniseerde gold, tassen, bekende veilingen en afgesloten sessies **per character**, en berekent telkens nieuwe onderzoeks- en handelsadviezen op basis van historische prijsdata en beschikbare gold. De Windows-bridge verstuurt sessiegegevens na uitloggen en zet een korte `FT3`-controleplanning en adviezen per character klaar voordat WoW opnieuw start.
