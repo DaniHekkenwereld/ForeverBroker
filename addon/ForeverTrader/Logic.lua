@@ -8,7 +8,7 @@ function L.plan(text,now)
     local h,body=text:match('^(FT3|eu%-2%-110|%d+|%d+);(.*)$')
     if not h then return nil,'Verkeerde markt of formaat. Kopieer alleen de volledige FT3-regel.' end
     local made,expires=h:match('(%d+)|(%d+)$'); made,expires=tonumber(made),tonumber(expires)
-    if made>now+60 or expires<=now or expires<=made or expires-made>86400 then return nil,'Planning verlopen of ongeldige tijd' end
+    if made>now+60 or expires<=made or expires-made>86400 or now>=made+86400 then return nil,'Planning verlopen of ongeldige tijd' end
     local list,seen={},{}
     local monitorOnly=true
     for row in body:gmatch('[^;]+') do
@@ -20,8 +20,13 @@ function L.plan(text,now)
         if not monitor then monitorOnly=false end
         seen[i]=true; list[#list+1]={id=i,max=p,qty=q,target=s,hold=hold,monitor=monitor}
     end
-    -- Long-lived queues are search-only; reject stale executable trading plans.
+    -- Long-lived queues are search-only. Older VPS builds issued 30-60 minute
+    -- monitor plans; extend those locally, never actionable trading plans.
     if expires-made>7200 and not monitorOnly then return nil,'Verlopen handelsadvies' end
+    if expires<=now then
+        if not monitorOnly then return nil,'Handelsadvies verlopen' end
+        expires=made+86400
+    end
     return {made=made,expires=expires,rows=list}
 end
 function L.next(s,now)
