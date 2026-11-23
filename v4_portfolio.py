@@ -214,7 +214,7 @@ def build(db,market,market_t,clock,cfg,investments=None):
         'characters':char_rows,'gold_total_last_known':gold_total,
         'gold_recent_7d':gold_recent,'wallet_count':known_wallets,
         'wallet_missing':unknown_wallets,'bank_not_seen':missing_banks,
-        'market_fresh':source_fresh,'holdings':rows[:450],
+        'market_fresh':source_fresh,'holdings':rows,
         'holding_types':len(rows),'portfolio_ask_mark':quoted_total,
         'unpriced_holding_types':unpriced,
         'estimated_value_warning':(
