@@ -34,8 +34,17 @@ Auctionator={
     EventBus={Register=function(self,listener,registered)self.listener=listener;self.event=registered[1] end},
     IncrementalScan={Events={ScanComplete='incremental_scan_complete'}}
 }
-C_Container={GetContainerNumSlots=function()return 1 end,
-             GetContainerItemInfo=function()return nil end}
+local bankAccessible=false
+C_Container={GetContainerNumSlots=function(bag)
+    if bag==-1 then return bankAccessible and 28 or 0 end
+    return 1
+end,GetContainerItemInfo=function(bag,slot)
+    if bag==0 and slot==1 then return {itemID=14344,stackCount=2,isBound=true,isLocked=false} end
+    if bankAccessible and bag==-1 and slot==1 then return {itemID=12363,stackCount=5,isBound=false} end
+    if bankAccessible and bag==5 and slot==1 then return {itemID=16203,stackCount=3,isBound=true} end
+    return nil
+end}
+function GetInventoryItemID(_,slot) if slot==16 then return 18832 end end
 C_AuctionHouse={
     MakeItemKey=function(id)return {itemID=id} end,
     IsThrottledMessageSystemReady=function()return true end,
@@ -71,6 +80,25 @@ assert(ForeverTraderDB.characters['eu-2-110#Mage Pump'].gold==500000,'gold captu
 assert(ForeverTraderDB.charactersWire:find('eu-2-110|Mage Pump|Alliance|500000',1,true),'bounded export should include mage')
 local firstRow=ForeverTraderDB.charactersWire:match('^FTCHAR1;([^;]+)')
 assert(firstRow and select(2,firstRow:gsub('|',''))==13,'character export must have exactly 14 columns')
+local self=ForeverTraderDB.characters['eu-2-110#Mage Pump']
+assert(self.bags[14344]==2 and self.bagBound[14344]==2,
+       'bound bag items must count as owned but not automatically sellable')
+assert(self.equipment[18832]==1,'equipped gear must be exported')
+assert(self.bankAt==nil,'bank must remain unobserved until opened')
+bankAccessible=true
+fire('BANKFRAME_OPENED')
+self=ForeverTraderDB.characters['eu-2-110#Mage Pump']
+assert(self.bank[12363]==5 and self.bank[16203]==3,
+       'main bank and first bank bag must be counted independently')
+assert(self.bankBound[16203]==3,'bank soulbound items must be flagged')
+assert(ForeverTraderDB.stockWire:find('FTSTOCK1;',1,true),
+       'new stockWire must coexist with old 14-column export')
+fire('BANKFRAME_CLOSED')
+bankAccessible=false
+fire('BANKFRAME_OPENED')
+self=ForeverTraderDB.characters['eu-2-110#Mage Pump']
+assert(self.bank[12363]==5,'unavailable bank slots must NOT wipe last bank snapshot')
+fire('BANKFRAME_CLOSED')
 SlashCmdList.FOREVERTRADER('market')
 SlashCmdList.FOREVERTRADER('start')
 fire('MAIL_SHOW');fire('MAIL_INBOX_UPDATE')
