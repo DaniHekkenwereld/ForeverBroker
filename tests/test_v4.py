@@ -63,6 +63,8 @@ class V4EngineTests(unittest.TestCase):
         self.assertFalse(any(a['kind']=='VERIFY_BUY' and a['id']==1111 for a in warrior['actions']))
         self.assertIn('1111:0:0:0:0',mage['plan'])
         self.assertNotIn('1111:10000:',mage['plan'])
+        self.assertEqual(int(mage['plan'].split('|')[3].split(';')[0]),self.now+86400)
+        self.assertLess(mage['expires_at'],self.now+86400)
         self.assertEqual(self.db.execute('SELECT COUNT(*) FROM v4_strategies').fetchone()[0],2)
 
     def test_inventory_and_auctions_are_not_double_bought(self):
