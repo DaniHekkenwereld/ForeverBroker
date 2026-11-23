@@ -102,7 +102,7 @@ assert(prints[#prints]:find('Geen geldige V4%-zoeklijst geladen'), 'auto must ex
 SlashCmdList.FOREVERTRADER('auto off')
 -- Reconnect after the old search timeout with a valid desktop trading plan.
 clock=clock+40
-ForeverTraderDB.planText='FT3|eu-2-110|'..clock..'|'..(clock+900)..';2589:140:10:200:0'
+ForeverTraderDB.v4PlanBlob='FT4!eu-2-110#Mage Pump?FT3|eu-2-110|'..clock..'|'..(clock+900)..';2589:140:10:200:0'
 fire('PLAYER_LOGIN')
 SlashCmdList.FOREVERTRADER('start')
 fire('AUCTION_HOUSE_SHOW')
