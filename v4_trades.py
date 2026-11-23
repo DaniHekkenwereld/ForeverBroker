@@ -75,7 +75,8 @@ def summarize(db,items=None,limit=60):
     query="""SELECT trade_id,character_key,happened_at,side,item_id,quantity,
                     total_copper FROM v4_manual_trades
               ORDER BY happened_at,trade_id"""
-    records=[dict(r) for r in db.execute(query)]
+    exists=db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='v4_manual_trades'").fetchone()
+    records=[dict(r) for r in db.execute(query)] if exists else []
     lots={}
     for r in records:
         key=(r['character_key'],r['item_id'])
