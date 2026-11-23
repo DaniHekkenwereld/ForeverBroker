@@ -408,18 +408,43 @@ local function searchNext(id,quiet)
         if quiet then
             s.autoSearchCount=(s.autoSearchCount or 0)+1
             db().lastAutoSearch=now()..'|'..r.id..'|'..s.autoSearchCount
-            if s.autoSearchCount==1 or s.autoSearchCount%15==0 then say('Automatisch '..s.autoSearchCount..' AH-items gecontroleerd (laatste: '..name(r.id)..').') end
+            if s.autoSearchCount==1 or s.autoSearchCount%15==0 then say('Automatisch '..s.autoSearchCount..' AH-zoekopdrachten verstuurd (laatste: '..name(r.id)..').') end
         else say('AH-zoekopdracht verstuurd: '..name(r.id)..'. Wacht op resultaat.') end
     end
     update()
 end
+-- Diagnose every silent auto-search gate. The search list is read-only.
+local function autoBlockReason()
+    if not s.autoSearch then return 'Automatisch zoeken staat uit.' end
+    if not s.active then return 'Start eerst de coach met /ft start.' end
+    -- If the client missed AUCTION_HOUSE_SHOW, recover from the visible AH.
+    if not s.ahOpen and AuctionHouseFrame and AuctionHouseFrame.IsShown and AuctionHouseFrame:IsShown() then
+        s.ahOpen=true
+    end
+    if not s.ahOpen then return 'Auction House niet herkend. Open het AH-venster en probeer /ft auto status.' end
+    if not realmOK() then return 'Alleen EU Alliance wordt ondersteund.' end
+    if not plan then return 'Geen geldige V4-zoeklijst geladen. /ft v4 kan wel tasadviezen tonen zonder zoeklijst.' end
+    if now()>=plan.expires then return 'V4-zoeklijst verlopen. Sluit WoW volledig en voer PREPARE-V4.bat opnieuw uit.' end
+    if not plan.rows or #plan.rows==0 then return 'Server heeft 0 AH-items op de zoeklijst gezet.' end
+    if pending then return 'Wachten op AH-resultaten voor item '..pending.id..'.' end
+    if s.bought or s.buyBlocked then return 'Wacht op mailboxcontrole na een aankoop.' end
+    if s.mailAlert then return 'Nieuw mailsignaal; controleer eerst de mailbox.' end
+    if s.buyCount>0 or s.sellCount>0 then return 'Actueel koop/verkoopadvies wacht op je beoordeling.' end
+    if not s.searchCandidate then return 'Alle zoekitems zijn recent gecontroleerd of worden nog verwerkt.' end
+    if now()-lastQuery<5 then return 'Wachten op AH-zoekcooldown (5 seconden).' end
+    local a=C_AuctionHouse
+    if not a or not a.SendSearchQuery or not a.MakeItemKey then
+        return 'AH-zoekfuncties ontbreken in deze WoW-client.'
+    end
+    if not a.IsThrottledMessageSystemReady or not a.IsThrottledMessageSystemReady() then
+        return 'AH-server laat momenteel geen nieuwe zoekopdracht toe (throttle).'
+    end
+    return nil
+end
+
 -- Read-only queries only. Pause on actionable results, throttle and mailbox hints.
 local function maybeAutoSearch()
-    if not s.autoSearch or not s.active or not s.ahOpen or not realmOK() then return end
-    if not plan or now()>=plan.expires or pending or s.bought or s.buyBlocked or s.mailAlert then return end
-    if s.buyCount>0 or s.sellCount>0 or not s.searchCandidate then return end
-    if now()-lastQuery<5 then return end
-    if not C_AuctionHouse or not C_AuctionHouse.IsThrottledMessageSystemReady or not C_AuctionHouse.IsThrottledMessageSystemReady() then return end
+    if autoBlockReason() then return end
     searchNext(nil,true)
 end
 local function mailSignal() if HasNewMail then local has=HasNewMail() and true or false;if has and not s.lastMailSignal and not s.mailOpen then s.mailAlert=true end;s.lastMailSignal=has end end
@@ -491,9 +516,18 @@ SLASH_FOREVERTRADER1='/ft';SlashCmdList.FOREVERTRADER=function(msg)
         if msg=='start' then s.active=true;ui:Show();mailSignal();getBags();lastCode=nil
         elseif msg=='auto on' then
             s.autoSearch=true;s.active=true;s.autoSearchCount=0
-            ui:Show();say('Automatisch AH-zoeken AAN; server-throttle en actieve koopadviezen pauzeren de wachtrij.')
+            ui:Show();update()
+            say('Automatisch AH-zoeken AAN; alleen zoekopdrachten, geen aankopen.')
+            local reason=autoBlockReason()
+            if reason then say('Auto status: '..reason) else maybeAutoSearch() end
         elseif msg=='auto off' then s.autoSearch=false;say('Automatisch AH-zoeken UIT.')
-        elseif msg=='auto' then say('Automatisch AH-zoeken '..(s.autoSearch and 'AAN' or 'UIT')..'. /ft auto on of /ft auto off.')
+        elseif msg=='auto' or msg=='auto status' then
+            update()
+            say('Auto: '..(s.autoSearch and 'AAN' or 'UIT')..
+                ' | zoeklijst: '..(plan and #plan.rows or 0)..
+                ' | opdrachten: '..(s.autoSearchCount or 0))
+            local reason=autoBlockReason()
+            say('Auto status: '..(reason or 'Klaar om te zoeken.'))
         elseif msg=='live on' then
             if not s.ahOpen and AuctionHouseFrame and AuctionHouseFrame.IsShown and AuctionHouseFrame:IsShown() then s.ahOpen=true end
             if not realmOK() or not s.ahOpen or not s.walletKnown then say('Live test alleen met AH open, bevestigde EU Alliance en geladen wallet.');return end
@@ -526,7 +560,7 @@ SLASH_FOREVERTRADER1='/ft';SlashCmdList.FOREVERTRADER=function(msg)
             if count==0 then say('Geen V4-adviezen beschikbaar voor dit character.') end
             lastCode=nil
         elseif msg=='status' or msg=='' then ui:Show();lastCode=nil
-        else say('/ft start | stop | v4 | identity | market | auto on/off | live on/off | plan | bought | mail | search [itemID] | status');return end
+        else say('/ft start | stop | v4 | identity | market | auto on/off/status | live on/off | plan | bought | mail | search [itemID] | status');return end
         update()
     end)
 end
