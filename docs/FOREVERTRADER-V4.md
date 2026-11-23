@@ -8,7 +8,7 @@ De Windows-bridge is de enige component die met de VPS communiceert en SavedVari
 
 ## Automatische marktidentiteit op WoW Forever
 
-De addon is voor **EU PvP Alliance** gebouwd en gebruikt voor character- en sessie-identiteit altijd de vaste publieke marktcode `eu-2-110`, zoals `eu-2-110#Character`. Dat is een **markt-ID, geen in-game realmnaam**.
+De addon is voor **EU PvP Alliance** gebouwd en gebruikt voor character- en sessie-identiteit altijd de vaste publieke marktcode `eu-2-110`, bijvoorbeeld `eu-2-110#Voornaam Achternaam`. Dat is een **markt-ID, geen in-game realmnaam**. WoW Forever heeft voornaam én achternaam; `UnitName('player')` en `UnitFullName('player')` geven de achternaam als tweede waarde terug, niet de realm. `GetUnitName('player', true)` kan de volledige naam teruggeven. De addon gebruikt daarom **de volledige voor- en achternaam** om spelers met dezelfde voornaam niet samen te voegen.
 
 Sinds de Forever-clientwijzigingen in november 2026 kunnen `GetRealmName()` en vergelijkbare functies leeg of onbetrouwbaar zijn. De addon hangt daarom niet meer af van realmnaam-CVars, `/ft realm ...`, of handmatige `/ft market`-bevestiging. De addon leest zelf de characternaam, faction en regio. Alleen EU Alliance krijgt de live-AH-coach; het marktprofiel zelf is bewust vooraf geconfigureerd voor de specifieke Forever-installatie, niet via een onbetrouwbare realm API gedetecteerd.
 
