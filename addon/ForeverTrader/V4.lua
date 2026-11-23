@@ -79,7 +79,8 @@ end
 
 function V.login(d,clock,realm,character,gold,bags)
     if not (type(d)=='table' and type(clock)=='number' and
-            type(realm)=='string' and type(character)=='string') then return end
+            type(realm)=='string' and #realm>0 and
+            type(character)=='string' and #character>0) then return end
     d.v4Sessions=type(d.v4Sessions)=='table' and d.v4Sessions or {}
     d.v4SessionCounter=(tonumber(d.v4SessionCounter) or 0)+1
     local id=(realm..':'..character..':'..clock..':'..d.v4SessionCounter):gsub('[^%w_.:-]','_')
