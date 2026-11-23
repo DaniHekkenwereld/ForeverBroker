@@ -6,12 +6,16 @@ No inferred cost basis or automatic trade decisions.
 """
 import math
 import statistics
+import datetime as dt
 
 import characters
 import v4_investing
 
 MARKET='eu-2-110'
 
+RAID_OPEN_DATE=dt.date(2026,12,9)
+RAID_OPEN_SOURCE='https://worldofwarcraft.blizzard.com/en-us/news/24303862/world-of-warcraft-forever-whats-next'
+# Blizzard confirms the raid unlock DATE, not guaranteed demand/price movement.
 THEMES={
     12363:('Nieuwe craftingvraag / tiers',
            'Arcane Crystal kan via transmute Arcanite opleveren voor crafting; '
@@ -199,6 +203,8 @@ def build(db,market,market_t,clock,cfg,investments=None):
             if len(buy)>=35:break
         if len(buy)>=35:break
     ideas=[]
+    date=dt.datetime.fromtimestamp(clock,dt.timezone.utc).date()
+    days_to_raid=(RAID_OPEN_DATE-date).days
     for item,(theme,thesis) in THEMES.items():
         q=market.get(item) or {}
         inv=by_invest.get(item) or {}
@@ -208,8 +214,13 @@ def build(db,market,market_t,clock,cfg,investments=None):
                       'volume_24h':q.get('vol24') if type(q.get('vol24')) is int else None,
                       'trend_7d_pct':inv.get('change_7d_pct'),
                       'owned':holdings.get(item,{}).get('total',0),
-                      'event_date':None,
-                      'status':'ONDERZOEKEN, GEEN BEVESTIGDE TIERKATALYSATOR'})
+                      'event_date':RAID_OPEN_DATE.isoformat(),
+                      'event_name':'Eerste raids openen (bevestigd)',
+                      'days_to_event':days_to_raid,
+                      'event_source':RAID_OPEN_SOURCE,
+                      'status':('BEVESTIGDE RAID-DATUM, PRIJSIMPACT ONBEWEZEN'
+                                if days_to_raid>=0 else
+                                'RAIDS AL OPEN, NIEUWE TIERDATUM ONBEKEND')})
     return {
         'characters':char_rows,'gold_total_last_known':gold_total,
         'gold_recent_7d':gold_recent,'wallet_count':known_wallets,
