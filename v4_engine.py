@@ -182,7 +182,11 @@ def build_character(character, market, market_t, clock, cfg, history=None):
     # Keep scan queue read-only. A publicly observed spread cannot issue a
     # transaction: every row is explicitly max=qty=target=0.
     made=clock
-    plan='FT3|'+MARKET+'|'+str(made)+'|'+str(expires)+';'
+    # This is a read-only AH search queue: no bids, quantities or prices.
+    # Keep it usable through long game sessions. Actionable evidence still
+    # expires using the independent short strategy expires_at above.
+    queue_expires=clock+86400
+    plan='FT3|'+MARKET+'|'+str(made)+'|'+str(queue_expires)+';'
     plan+=';'.join(f"{r['id']}:0:0:0:0" for r in ranked)
     if not ranked:
         plan=''
