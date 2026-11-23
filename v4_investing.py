@@ -98,7 +98,9 @@ def analyze(db,market,at,cfg,clock=None):
         volume=x.get('vol24') if type(x.get('vol24')) is int and x['vol24']>=0 else None
         sure=x.get('sure24') if type(x.get('sure24')) is int and x['sure24']>=0 else None
         cls=x.get('cls') or 'Unknown'
-        suffix=cls in ('Armor','Weapon') or bool(x.get('nc'))
+        # Non-commodity does not automatically mean a random-suffix item:
+        # recipes/pets have exact IDs, but Armor/Weapons can vary materially.
+        suffix=cls in ('Armor','Weapon')
         # Trade-goods basket is a price index from matched items with two
         # complete seven-day windows: not the entire WoW gold inflation rate.
         if (cls in ('Trade Goods','Consumable','Consumables') and not suffix
