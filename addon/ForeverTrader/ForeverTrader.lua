@@ -259,7 +259,7 @@ update=function()
     s.buyCount=#buys;s.sellCount=#sells
     local code,msg=L.next(s,now());bridgeStatus(code);local lines={msg,'Gold '..gold(s.cash)..' | Incoming (laatst gezien) '..gold(s.pending)..' | Klaar (laatst gezien) '..gold(s.ready)}
     if s.v4PlanLoaded then lines[#lines+1]='V4: serverstrategie geladen voor dit character (/ft v4)' end
-    if s.autoSearch then lines[#lines+1]='AUTO ZOEKEN: aan ('..(s.autoSearchCount or 0)..' opdrachten)' end
+    if s.autoSearch then lines[#lines+1]='AUTO ZOEKEN: '..(s.autoSearchCount or 0)..' gestuurd / '..(s.autoResultCount or 0)..' resultaten' end
     if s.live then
         lines[#lines+1]='LIVE TEST: alleen adviezen, transacties zelf klikken!'
         lines[#lines+1]='Budget gebruikt '..gold(s.liveSpent)..'/5.00g | max 1g per advies | reserve 15g'
@@ -343,6 +343,15 @@ local function browseSummary()
     end
     if #rows>0 then s.scanAt=now();db().browseSummary=s.scanAt..';'..table.concat(rows,';');say('Volledige browse-samenvatting ontvangen: '..#rows..' items.');end
 end
+-- Persist a bounded audit trail; WoW writes it on logout or /reload.
+local function logAuto(kind,id,price,rows)
+    if type(id)~='number' or id<1 then return end
+    local entry=now()..':'..kind..':'..id..':'..math.floor(price or 0)..':'..(rows or 0)
+    local d=db();local log=d.v4SearchLog or ''
+    log=(log=='' and entry or log..';'..entry)
+    while #log>14000 do log=log:match('^[^;]+;(.*)$') or '' end
+    d.v4SearchLog=log
+end
 local function targeted(e,key)
     if not s.ahOpen or not realmOK() or not C_AuctionHouse then return end
     local kind=e:find('COMMODITY',1,true) and 'commodity' or 'item'
@@ -351,8 +360,17 @@ local function targeted(e,key)
         if maybe then targetBook[maybe]=nil;if pending and pending.id==maybe then pending.kind=kind end end
         return
     end
+    local tracked=pending and pending.id==id and s.autoSearch
     targetBook[id]=b
     if pending and pending.id==id then pending=nil end
+    if tracked then
+        local count=#(b.stacks or {})
+        s.autoResultCount=(s.autoResultCount or 0)+1
+        s.lastAutoResult={id=id,at=now(),price=b.floor or 0,rows=count}
+        logAuto('R',id,b.floor or 0,count)
+        say('AH resultaat: '..name(id)..' | laagste '..gold(b.floor or 0)..
+            '/stuk | '..count..' prijsregels (geen bewezen verkoop).')
+    end
     if not s.bought then s.buyBlocked=false end
     local row=T.record(id,b)
     if row then
@@ -408,7 +426,8 @@ local function searchNext(id,quiet)
         if quiet then
             s.autoSearchCount=(s.autoSearchCount or 0)+1
             db().lastAutoSearch=now()..'|'..r.id..'|'..s.autoSearchCount
-            if s.autoSearchCount==1 or s.autoSearchCount%15==0 then say('Automatisch '..s.autoSearchCount..' AH-zoekopdrachten verstuurd (laatste: '..name(r.id)..').') end
+            logAuto('Q',r.id,0,0)
+            say('AH zoekt '..s.autoSearchCount..': '..name(r.id)..' (item '..r.id..').')
         else say('AH-zoekopdracht verstuurd: '..name(r.id)..'. Wacht op resultaat.') end
     end
     update()
@@ -452,7 +471,7 @@ frame:SetScript('OnEvent',function(_,e,...)
     check(function()
         if e=='PLAYER_LOGIN' then
             ensureAuctionatorListener()
-            s.loggingOut=false;s.autoSearch=false;s.autoSearchCount=0
+            s.loggingOut=false;s.autoSearch=false;s.autoSearchCount=0;s.autoResultCount=0;s.lastAutoResult=nil
             s.live=false;s.liveSpent=0;s.walletKnown=false;s.bagsKnown=false;s.ownedKnown=false
             s.mailKnown=false;s.active=false;s.cash=0;s.ahOpen=false;s.mailOpen=false
             bags={};listed={};targetBook={}
@@ -513,7 +532,7 @@ SLASH_FOREVERTRADER1='/ft';SlashCmdList.FOREVERTRADER=function(msg)
     msg=original:lower():match('^%s*(.-)%s*$');check(function()
         if msg=='start' then s.active=true;ui:Show();mailSignal();getBags();lastCode=nil
         elseif msg=='auto on' then
-            s.autoSearch=true;s.active=true;s.autoSearchCount=0
+            s.autoSearch=true;s.active=true;s.autoSearchCount=0;s.autoResultCount=0;s.lastAutoResult=nil
             ui:Show();update()
             say('Automatisch AH-zoeken AAN; alleen zoekopdrachten, geen aankopen.')
             local reason=autoBlockReason()
@@ -523,7 +542,12 @@ SLASH_FOREVERTRADER1='/ft';SlashCmdList.FOREVERTRADER=function(msg)
             update()
             say('Auto: '..(s.autoSearch and 'AAN' or 'UIT')..
                 ' | zoeklijst: '..(plan and #plan.rows or 0)..
-                ' | opdrachten: '..(s.autoSearchCount or 0))
+                ' | verzonden: '..(s.autoSearchCount or 0)..
+                ' | resultaten: '..(s.autoResultCount or 0))
+            if s.lastAutoResult then
+                local r=s.lastAutoResult
+                say('Laatste AH-resultaat: '..name(r.id)..' | '..gold(r.price)..'/stuk | '..r.rows..' prijsregels')
+            end
             local reason=autoBlockReason()
             say('Auto status: '..(reason or 'Klaar om te zoeken.'))
         elseif msg=='live on' then
