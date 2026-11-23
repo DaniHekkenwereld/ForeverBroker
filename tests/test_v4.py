@@ -89,6 +89,17 @@ class V4EngineTests(unittest.TestCase):
         self.assertLess(mage['expires_at'],self.now+86400)
         self.assertEqual(self.db.execute('SELECT COUNT(*) FROM v4_strategies').fetchone()[0],2)
 
+    def test_liquid_market_still_produces_readonly_scan_without_spreads(self):
+        self.add_character('Mage',1000000)
+        only_liquid={2589:{'name':'Linen Cloth','ask':100,'ask2':100,
+                           'median':100,'vol24':999,'depth5':50}}
+        self.db.execute('DELETE FROM market_snapshots')
+        trader.save_market(self.db,self.now,only_liquid,self.now,'tk')
+        self.db.commit()
+        plan=v4.strategy_list(self.db,self.now,self.c)[0]
+        self.assertIn('2589:0:0:0:0',plan['plan'])
+        self.assertFalse(any(a['kind']=='VERIFY_BUY' for a in plan['actions']))
+
     def test_inventory_and_auctions_are_not_double_bought(self):
         self.add_character('Mage',1000000,{1111:3})
         s=v4.strategy_list(self.db,self.now,self.c)[0]
