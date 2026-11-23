@@ -6,6 +6,12 @@ class V2Tests(unittest.TestCase):
     def setUp(self):
         self.temp=tempfile.TemporaryDirectory();self.folder=pathlib.Path(self.temp.name);self.db=ft.connect(self.folder/'test.sqlite');self.c=ft.conf();self.vid=ft.register(self.db,self.c);self.t=ft.ts('2026-11-21T08:00:00Z');self.db.commit()
     def tearDown(self):self.db.close();self.temp.cleanup()
+    def test_next_market_attempt_keeps_hourly_cadence(self):
+        last=ft.ts('2026-11-23T11:27:37Z')
+        self.assertEqual(ft.next_market_attempt(last),ft.ts('2026-11-23T12:27:37Z'))
+        self.assertEqual(ft.next_market_attempt(ft.ts('2026-11-23T11:22:00Z')),ft.ts('2026-11-23T12:27:00Z'))
+        self.assertEqual(ft.next_market_attempt(ft.ts('2026-11-23T11:59:55Z')),ft.ts('2026-11-23T12:59:55Z'))
+        self.assertEqual(ft.next_market_attempt(0),0)
     def test_market_history_and_duplicate(self):
         _,m=old.demo_market(self.t,0);self.assertTrue(ft.save_market(self.db,self.t,m,self.t,'demo'));self.assertFalse(ft.save_market(self.db,self.t,m,self.t,'demo'));self.assertEqual(self.db.execute('select count(*) from price_history').fetchone()[0],len(m))
     def test_import(self):
