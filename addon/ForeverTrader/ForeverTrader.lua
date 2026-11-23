@@ -461,8 +461,33 @@ local function targeted(e,key)
         s.autoResultCount=(s.autoResultCount or 0)+1
         s.lastAutoResult={id=id,at=now(),price=b.floor or 0,rows=count}
         logAuto('R',id,b.floor or 0,count)
-        say('AH resultaat: '..name(id)..' | laagste '..gold(b.floor or 0)..
+        say('AH resultaat: '..name(id)..' | laagste '..goldExact(b.floor or 0)..
             '/stuk | '..count..' prijsregels (geen bewezen verkoop).')
+        if V4 then
+            local realm,character=identity()
+            if realm and character then
+                V4.actions(db(),realm,character,function(action,item,qty,maxBuy,target)
+                    if item==id and (action=='INVEST_SHORT' or action=='INVEST_LONG')
+                       and type(maxBuy)=='number' then
+                        local freshPlan=plan and plan.made and
+                            now()>=plan.made and now()-plan.made<=5400
+                        if not freshPlan then
+                            say('INVESTERING '..name(id)..': advies ouder dan 90 minuten.'..
+                                ' Alleen prijscontrole, niet op oud advies kopen.')
+                        elseif not b.floor or b.floor<=0 then
+                            say('INVESTERING '..name(id)..': geen verkoopbare AH-prijs gevonden.')
+                        elseif b.floor<=maxBuy then
+                            say('INSTAPPRIJS GEHAALD '..name(id)..': '..goldExact(b.floor)..
+                                ' <= limiet '..goldExact(maxBuy)..
+                                '. Alleen handmatig kopen na controle van variant, volume en risico.')
+                        else
+                            say('TE DUUR '..name(id)..': AH '..goldExact(b.floor)..
+                                ' > maximale instap '..goldExact(maxBuy)..'. Niet blind kopen.')
+                        end
+                    end
+                end)
+            end
+        end
     end
     if not s.bought then s.buyBlocked=false end
     local row=T.record(id,b)
