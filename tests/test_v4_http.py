@@ -101,12 +101,27 @@ class HttpV4Tests(unittest.TestCase):
                  'equipment':{'18832':1},'equipment_at':stamp}
         mage={**base,'character_key':'acct:eu-2-110:Mage Pump',
               'character':'Mage Pump','gold':500000,'bags':{}}
+        trades=[
+            {'id':'acct:trade-1','character_key':warrior['character_key'],
+             'at':stamp-60,'side':'BUY','item_id':12363,
+             'quantity':2,'total_copper':100000},
+            {'id':'acct:trade-2','character_key':warrior['character_key'],
+             'at':stamp-30,'side':'SELL','item_id':12363,
+             'quantity':1,'total_copper':120000},
+        ]
         accepted=self.req('/api/v4/sync','POST',{
-            'schema':'FT4SYNC1','characters':[warrior,mage],'sessions':[]})
+            'schema':'FT4SYNC1','characters':[warrior,mage],
+            'sessions':[],'trades':trades})
         self.assertTrue(accepted['ok'])
+        self.assertEqual(accepted['trades_added'],2)
         research=self.req('/api/v4/research')
         p=research['portfolio']
         self.assertEqual(p['gold_total_last_known'],2500000)
+        self.assertEqual(p['realized_profit'],70000)
+        self.assertEqual(p['trade_count'],2)
+        self.assertEqual(self.req('/api/v4/sync','POST',{
+            'schema':'FT4SYNC1','characters':[warrior,mage],
+            'sessions':[],'trades':trades})['trades_added'],0)
         self.assertEqual(len(p['characters']),2)
         owned={r['id']:r for r in p['holdings']}
         self.assertEqual(owned[12363]['bank'],5)
