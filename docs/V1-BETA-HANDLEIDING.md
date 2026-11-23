@@ -17,8 +17,9 @@ Daarna kun je DASHBOARD-V4.bat gebruiken om alleen het dashboard te openen. De W
 1. Log met de vernieuwde addon in op elk character.
 2. Open op elk character de bank minstens één keer. Anders kunnen bankitems niet betrouwbaar worden gelezen.
 3. Tassen inclusief gebonden items, uitgeruste gear en gold worden geregistreerd. Bij een open AH worden eigen veilingen geregistreerd.
-4. Log uit of voer /reload uit; de client schrijft SavedVariables en de Windows-bridge verstuurt de informatie naar de VPS.
-5. Open het dashboard. Je ziet per character gold, voorraad per locatie, ouderdom van metingen, mogelijke marktwaarde en wat te controleren.
+4. Typ /ft portfolio in WoW om direct de gemeten gold, tassen, gear en de bankstatus van dit character te controleren.
+5. Log uit of voer /reload uit; de client schrijft SavedVariables en de Windows-bridge verstuurt de informatie naar de VPS.
+6. Open het dashboard. Je ziet per character gold, voorraad per locatie, ouderdom van metingen, mogelijke marktwaarde en wat te controleren.
 
 Bankgegevens worden niet gewist omdat de bank bij een latere login gesloten is. Oude/ontbrekende stockmetingen worden zichtbaar gemaakt. De addon kan tijdens inloggen niet rechtstreeks over HTTPS synchroniseren. De synchronisatie vindt na een WoW-save plaats.
 
