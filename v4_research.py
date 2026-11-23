@@ -11,6 +11,7 @@ import opportunities
 import trader
 import characters
 import v4_engine
+import v4_investing
 
 MARKET = 'eu-2-110'
 RESEARCH_LIMIT = 120
@@ -36,6 +37,8 @@ def build(db, clock, cfg):
         'market_fresh':False, 'market_age_seconds':None,
         'market_items':0, 'priced_items':0, 'candidate_count':0,
         'opportunities':[], 'lookup':{},'budget_copper':None,'budget_character':None,
+        'investments':[],'shortlist_count':0,'rising_count':0,'falling_count':0,
+        'basket_change_7d_pct':None,'basket_item_count':0,
         'last_attempt':trader.getmeta(db,'market_attempt',0) or None,
         'last_error':trader.getmeta(db,'market_last_error','') or None,
     }
@@ -47,16 +50,16 @@ def build(db, clock, cfg):
                   market_fresh=0<=age<=MARKET_FRESH_SECONDS,
                   market_age_seconds=age,
                   market_items=len(market))
-    # Prioritise items the most recently seen Alliance character can
-    # actually afford within the conservative V4 5g research budget.
-    # This does not authorise a purchase.
+    # The investment radar works on all affordable and unaffordable items.
+    # Capital budgeting is presented separately; it never hides market trends.
+    result.update(v4_investing.analyze(db,market,int(row['t']),cfg,clock))
     funding=0
     for char in characters.read_all(db):
         wallet=char.get('gold')
         wallet_at=char.get('wallet_at')
         if (char.get('faction')=='Alliance' and type(wallet) is int and wallet>=0
                 and type(wallet_at) is int and 0<=clock-wallet_at<=7*86400):
-            funding=min(50000, int(wallet*.10),
+            funding=min(int(wallet*.20),
                         max(0,wallet-math.ceil(wallet*.20)))
             result['budget_copper']=funding
             result['budget_character']=char.get('character')
@@ -65,7 +68,7 @@ def build(db, clock, cfg):
     # Never use them for estimates or implied vendor flips.
     no_vendor={i:{**x,'vendor':0} for i,x in market.items() if isinstance(x,dict)}
     ranked,coverage=opportunities.rank_market(
-        no_vendor,cfg,limit=300,budget_gold=max(1,funding/10000))
+        no_vendor,cfg,limit=300,budget_gold=1_000_000)
     result['priced_items']=coverage['priced']
     result['candidate_count']=coverage['spread_positive']
     # Historical data are populated by the existing VPS market importer only.
