@@ -238,9 +238,14 @@ function A.mailScan(getHeader,getInvoice,getCount)
                 -- they remain unresolved rather than double booked.
                 local expiry=type(daysLeft)=='number' and daysLeft>=0 and
                     (now+daysLeft*86400) or nil
+                -- A pending invoice can change quantity and refundable
+                -- deposit/net amount before the client has complete mail
+                -- data. Identify the *same* invoice by character, item name,
+                -- sender, subject and stable approximate expiry, so an
+                -- unresolved provisional observation resolves in-place
+                -- instead of leaving a phantom failure behind.
                 local signature=safe(state.realm)..'#'..safe(state.character)..':'..
-                    safe(name)..':'..safe(qty)..':'..safe(net)..':'..
-                    safe(sender)..':'..safe(subject)
+                    safe(name)..':'..safe(sender)..':'..safe(subject)
                 local matches=d.autoMailSeen[signature]
                 if type(matches)~='table' then matches={};d.autoMailSeen[signature]=matches end
                 local matched=false
