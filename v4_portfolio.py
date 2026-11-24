@@ -72,6 +72,7 @@ def build(db,market,market_t,clock,cfg,investments=None):
     source_fresh=fresh(market_t,clock,90*60)
     chars=characters.read_all(db)
     journal=v4_trades.summarize(db)
+    unresolved=v4_trades.recent_issues(db)
     char_names={c['character_key']:c['character'] for c in chars}
     char_rows=[]
     holdings={}
@@ -289,6 +290,13 @@ def build(db,market,market_t,clock,cfg,investments=None):
         'cost_basis_known':bool(journal['positions']),
         'trade_count':journal['trade_count'],
         'unmatched_sales':journal['unmatched_sales'],
+        'unresolved_ah_events':[{**x,
+             'character':char_names.get(x['character_key'],'Onbekend')}
+             for x in unresolved],
+        'unresolved_ah_count':len(unresolved),
+        'automatic_trade_count':sum(
+            1 for x in journal['recent_trades']
+            if x.get('source') in ('AH_BUY','AH_MAIL')),
         'trades':annotated,
         'basis_source':journal['basis_source'],
         'note':'Gebonden/uitgeruste items niet als verkoopbaar gewaardeerd. '
