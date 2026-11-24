@@ -5,6 +5,7 @@ it is never embedded in the HTML and no WoW files are touched.
 """
 import html
 import http.server
+import secrets
 import time
 import urllib.parse
 import webbrowser
@@ -33,6 +34,41 @@ def render_current(base,token,timestamp=None,filters=None):
     activity=v4_local_activity.load(now)
     page=v4_dashboard.render(strategies,now,research,activity,filters)
     return page.replace('<head>','<head><meta http-equiv="refresh" content="30">',1)
+
+
+# A tiny nonce-protected helper preserves expanded detail panels across browser
+# reloads. Auto-refresh pauses while a person is reading expanded data.
+# No external JS/CDN and no credentials are exposed to the document.
+UI_SCRIPT = """
+(function () {
+  'use strict';
+  const panels = Array.from(document.querySelectorAll('details.detail-group'));
+  const key = 'forevertrader-expanded-groups-v1';
+  let stored = [];
+  try { stored = JSON.parse(sessionStorage.getItem(key) || '[]'); }
+  catch (_) { stored = []; }
+  if (!Array.isArray(stored)) stored = [];
+  for (const panel of panels) {
+    if (stored.includes(panel.id)) panel.open = true;
+  }
+  for (const panel of panels) {
+    panel.addEventListener('toggle', () => {
+      try {
+        sessionStorage.setItem(key, JSON.stringify(
+          panels.filter(p => p.open).map(p => p.id)));
+      } catch (_) { /* Keep dashboard usable without storage. */ }
+    });
+  }
+  const oldRefresh = document.querySelector('meta[http-equiv="refresh"]');
+  if (oldRefresh) oldRefresh.remove();
+  window.setInterval(() => {
+    if (panels.some(p => p.open)) return;
+    const active = document.activeElement;
+    if (active && active.matches('input,select,button')) return;
+    window.location.reload();
+  }, 30000);
+})();
+"""
 
 
 class Handler(http.server.BaseHTTPRequestHandler):
@@ -64,13 +100,19 @@ class Handler(http.server.BaseHTTPRequestHandler):
                   'Deze pagina probeert het over 30 seconden opnieuw.</p>'
                   '</body></html>')
             status=503
+        nonce=secrets.token_urlsafe(20)
+        if status==200:
+            body=body.replace('</body>',
+                '<script nonce="'+nonce+'">'+UI_SCRIPT+'</script></body>',1)
         data=body.encode('utf-8')
         self.send_response(status)
         self.send_header('Content-Type','text/html; charset=utf-8')
         self.send_header('Cache-Control','no-store')
         self.send_header('X-Content-Type-Options','nosniff')
         self.send_header('Referrer-Policy','no-referrer')
-        self.send_header('Content-Security-Policy',"default-src 'none'; style-src 'unsafe-inline'; form-action 'self'")
+        self.send_header('Content-Security-Policy',
+                         "default-src 'none'; style-src 'unsafe-inline'; "+
+                         "script-src 'nonce-"+nonce+"'; form-action 'self'")
         self.send_header('Content-Length',str(len(data)))
         self.end_headers()
         self.wfile.write(data)
