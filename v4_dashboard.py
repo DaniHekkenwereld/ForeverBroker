@@ -11,6 +11,7 @@ import tempfile
 import v4_investing_ui
 import v4_portfolio_ui
 import v4_daily_ui
+import v4_quickview
 
 
 def escape(value):
@@ -240,8 +241,83 @@ button:hover{background:#216456}
 .character{border-top:1px solid var(--edge);padding-top:13px;margin-top:12px}
 .character:first-of-type{border-top:0}
 footer{padding-top:20px;color:#8e9bb0;font-size:12px}
-@media(max-width:720px){main{padding:16px}h1{font-size:23px}section{padding:15px}}
+/* Immediate visual hierarchy: icons are always accompanied by text. */
+.brand-spark{color:var(--green)}
+.action-center{margin-top:22px;padding:24px;background:linear-gradient(135deg,#142338,#0d1927 72%);border:1px solid #395169;border-radius:16px}
+.focus-heading{display:flex;justify-content:space-between;gap:20px;align-items:start;flex-wrap:wrap}
+.focus-heading h2{font-size:25px;letter-spacing:-.4px;margin:4px 0 0}
+.focus-heading>div:first-child{max-width:770px}
+.focus-headline{font-size:16px;font-weight:700!important;color:#e9f4ff!important;margin:8px 0 3px}
+.focus-headline.good{color:#a1efd9!important}
+.focus-headline.warn{color:#ffd392!important}
+.focus-status{display:flex;gap:8px;justify-content:flex-end;align-items:center;flex-wrap:wrap;max-width:400px;font-size:12px;color:var(--muted)}
+.action-pill{font-size:11px;font-weight:700;letter-spacing:.1px;border:1px solid #324a5c;padding:4px 8px;border-radius:50px;background:#1d2b3c;color:#bdd4ea;display:inline-flex;align-items:center;white-space:nowrap}
+.action-pill.good{color:#9ae7cd;background:#18372f;border-color:#306753}
+.action-pill.warn{color:#f6cc89;background:#3b2f21;border-color:#685132}
+.action-pill.neutral{color:#c3d4e9;background:#243347}
+.focus-metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:11px;margin:18px 0}
+.focus-metric{padding:13px;border:1px solid #31485e;background:#152337;border-radius:10px;display:flex;gap:11px;min-width:0}
+.focus-icon{flex:0 0 33px;height:33px;width:33px;display:grid;place-items:center;font-size:19px;border-radius:8px;background:#243448}
+.focus-metric>div{min-width:0}
+.focus-label{display:block;color:#b8cde2;font-size:11px;line-height:1.3}
+.focus-metric strong{display:block;font-size:19px;font-weight:750;white-space:nowrap;font-variant-numeric:tabular-nums}
+.focus-metric small{display:block;color:#93a9c0;font-size:10px;line-height:1.5}
+.action-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:13px}
+.action-card{display:flex;flex-direction:column;min-width:0;background:#111e30;border:1px solid #354a61;border-radius:12px;padding:16px}
+.action-card.good{border-top:3px solid #58bb9c}
+.action-card.warn{border-top:3px solid #dfb36d}
+.action-card.neutral{border-top:3px solid #8194aa}
+.action-card-head{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.action-card-head>div{display:flex;align-items:center;gap:9px}
+.action-card h3{margin:0;font-size:16px}
+.action-icon{width:34px;height:34px;border-radius:9px;display:grid;place-items:center;background:#24374c;font-size:19px}
+.action-count{font-size:21px;font-weight:800;font-variant-numeric:tabular-nums}
+.action-card-body{margin-top:11px;flex:1;min-width:0}
+.focus-row{padding:10px 0;border-top:1px solid #26364a}
+.focus-row:first-child{border-top:0}
+.focus-item{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-weight:650}
+.focus-item a{font-weight:700}
+.focus-row p{margin:5px 0 0;font-size:12px;color:#d5e1ed}
+.focus-small{font-size:11px;color:#9eb2c7;display:block;margin-top:3px}
+.empty-state{color:#adbfd2;min-height:52px}
+.action-foot{padding-top:9px;margin:12px 0 0;font-size:11px;color:#95a9be;border-top:1px solid #25374a}
+.focus-bottom{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;font-size:12px;color:#b8cce0;margin-top:18px;border-top:1px solid #31455b;padding-top:13px}
+.focus-bottom a{font-weight:650}
+.details-heading{padding:18px 2px 9px;margin-top:30px}
+.details-heading h2{font-size:22px;margin:3px 0 0}
+.details-heading p{margin:2px 0 0}
+.detail-group{margin:10px 0;background:#111c2c;border:1px solid #2b4055;border-radius:11px;overflow:hidden}
+.detail-group summary{list-style:none;display:flex;align-items:center;gap:10px;padding:15px 20px;cursor:pointer;user-select:none;min-height:65px}
+.detail-group summary::-webkit-details-marker{display:none}
+.detail-group summary:hover,.detail-group[open] summary{background:#1b2c3f}
+.detail-group summary:focus-visible{outline:2px solid #91d0fc;outline-offset:-2px}
+.detail-heading{font-weight:700;font-size:15px;flex:1}
+.detail-preview{font-size:12px;color:#a8bed5}
+.detail-chevron{font-size:22px;color:#a9c4df;transition:transform .15s}
+.detail-group[open] .detail-chevron{transform:rotate(180deg)}
+.detail-content{padding:18px 20px 22px;border-top:1px solid #2b4055}
+.detail-content .sectionhead h2{font-size:18px}
+.detail-content .metrics{margin-top:0}
+@media(max-width:1050px){.focus-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:720px){
+ main{padding:14px}h1{font-size:24px}section{padding:15px}
+ .action-center{padding:16px}.focus-heading h2{font-size:22px}
+ .focus-metrics,.action-grid{grid-template-columns:1fr}
+ .focus-metric strong{font-size:18px}
+ .detail-group summary{padding:13px;align-items:flex-start;flex-wrap:wrap}
+ .detail-preview{width:calc(100% - 32px)}.detail-content{padding:12px}
+}
+@media(prefers-reduced-motion:reduce){.detail-chevron{transition:none}}
 """
+
+
+def detail_group(id,title,preview,contents):
+    """Keep dense reference tables accessible, but out of the first viewport."""
+    return ('<details class="detail-group" id="'+escape(id)+'">'
+            '<summary><span class="detail-heading">'+escape(title)+'</span>'
+            '<span class="detail-preview">'+escape(preview)+'</span>'
+            '<span class="detail-chevron" aria-hidden="true">⌄</span></summary>'
+            '<div class="detail-content">'+contents+'</div></details>')
 
 
 def render(strategies,refreshed,research=None,activity=None,filters=None):
@@ -267,8 +343,8 @@ def render(strategies,refreshed,research=None,activity=None,filters=None):
         ('AH-zoeklijst',str(queue_items)+' items',str(len(strategies))+' characters'),
         ('Indicatieve per-item limiet '+str(research.get('budget_character') or ''),money(budget),
          '20% van bekende gold, geen automatisch investeringsbudget'),
-        ('Game-prijzen opgeslagen',str(activity.get('saved_prices',0)),
-         age(activity.get('saved_at'),refreshed)),
+        ('Game-prijzen op VPS',str(len(research.get('game_checks') or [])),
+         'Uit WoW opgeslagen via de Windows-bridge'),
     ]
     cards=''.join('<div class="metric"><small>'+escape(a)+'</small><strong>'+escape(b)+
                   '</strong><span>'+escape(c)+'</span></div>' for a,b,c in metrics)
@@ -327,29 +403,50 @@ def render(strategies,refreshed,research=None,activity=None,filters=None):
              'De bron zelf publiceert ongeveer één keer per uur. '
              'WoW schrijft zoeklogs bij /reload of uitloggen. De bridge slaat ze dan automatisch op de VPS op. '
              'Tijdens het spelen controleert de addon vanzelf zodra het AH opent.</p>')
+    portfolio=research.get('portfolio') or {}
+    panels=[
+        detail_group('portfolio','📦 Portfolio, characters en transacties',
+            str(len(portfolio.get('characters') or []))+' characters · '+
+            str(portfolio.get('holding_types') or 0)+' itemsoorten · '+
+            str(portfolio.get('trade_count') or 0)+' transacties',portfolio_html),
+        detail_group('daghandel','🕘 Daghandel',
+            str(len((research.get('intraday') or {}).get('patterns') or []))+
+            ' onderbouwde patronen',daily_html),
+        detail_group('investeringen','📈 Investeringen en trends',
+            str(research.get('shortlist_count') or 0)+' signalen · '+
+            str(research.get('rising_count') or 0)+' stijgers',invest_html),
+        detail_group('markt','🔍 Alle marktkansen',
+            str(rows_count)+' items voor verder onderzoek',opp_html),
+        detail_group('zoeklijst','📋 AH-zoeklijst per character',
+            str(queue_items)+' geplande controles',queue_html),
+        detail_group('scans','🧪 AH-controles en diagnose',
+            str(len(activity.get('events') or []))+' lokaal bewaarde zoekevents',scans_html),
+        detail_group('statistieken','📊 Alle marktstatistieken en uitleg',
+            'Bronnen, meettijd en onderliggende dekking',
+            '<div class="metrics">'+cards+'</div>'+details+
+            '<p>TK geeft vraagprijzen, historische vraagprijzen en deels afgeleid '
+            'verkoopvolume. Gameprijzen komen uit de addon en kunnen alweer verouderd zijn. '
+            'Er is geen automatisch kopen/verkopen en geen bewezen winst tot een echte verkoop.</p>'
+            '<p>Onderzoek ververst: '+escape(stamp(refreshed))+
+            ' · Laatste VPS-marktverzoek: '+escape(stamp(research.get('last_attempt')))+'</p>'),
+    ]
     return ('<!doctype html><html lang="nl"><head><meta charset="utf-8">'
             '<meta name="viewport" content="width=device-width,initial-scale=1">'
             '<title>ForeverTrader · Market Desk</title><style>'+CSS+'</style></head><body>'
-            '<main><div class="top"><div><div class="eyebrow">FOREVERTRADER / V4</div>'
-            '<h1>ForeverTrader 1.0 Beta · Portfolio &amp; Trading Desk</h1>'+
-            '<p>EU PvP Alliance · gold en items van alle characters · daghandel · lange termijn · verifieerbare AH-data</p></div>'
+            '<main><div class="top"><div><div class="eyebrow">FOREVERTRADER / 1.0 BETA</div>'
+            '<h1>Market Desk <span class="brand-spark" aria-hidden="true">↗</span></h1>'
+            '<p>EU PvP Alliance · Slimme kansen, eigen gold en voorraad</p></div>'
             '<div class="source">Bron: <a href="https://auctionhouse.tk.gg/data/" target="_blank" '
-            'rel="noopener noreferrer">TK Auction House</a> · '+escape(stamp(source_at))+'</div></div>'
-            '<div class="metrics">'+cards+'</div>'+warnings+
-            '<section>'+portfolio_html+'</section>'+
-            '<section>'+daily_html+'</section>'+
-            '<section>'+invest_html+'</section>'+
-            '<section>'+opp_html+'</section>'+
-            '<section>'+queue_html+'</section>'+
-            '<section>'+scans_html+'</section>'+
-            '<section><h2>Zo lees je de gegevens</h2>'+details+
-            '<p>TK geeft vraagprijzen, historische vraagprijzen en deels afgeleid verkoopvolume. '
-            'Gameprijzen komen uit de addon en kunnen alweer verouderd zijn. '
-            'Er is geen automatisch kopen/verkopen en geen bewezen winst tot een echte verkoop is vastgelegd.</p>'
-            '<p>Onderzoek verversen: '+escape(stamp(refreshed))+
-            ' · Laatste VPS-marktverzoek: '+escape(stamp(research.get('last_attempt')))+'</p></section>'
-            '<footer>ForeverTrader V4 · Alle bedragen in gold/silver/copper per item · '
-            'Vraagprijs ≠ transactieprijs · Geen vendorflips zonder clientbevestiging.</footer></main></body></html>')
+            'rel="noopener noreferrer">TK Auction House</a> · '+escape(stamp(source_at))+
+            '</div></div>'+
+            v4_quickview.render(research,refreshed)+warnings+
+            '<div class="details-heading" id="details"><div class="eyebrow">VERDIEPING</div>'
+            '<h2>Onderliggende gegevens</h2><p>Alle lange lijsten staan hieronder '
+            'uitgeklapt wanneer je ze nodig hebt. Het overzicht hierboven blijft leidend.</p></div>'+
+            ''.join(panels)+
+            '<footer>ForeverTrader 1.0 Beta · Alle bedragen per item in gold/silver/copper · '
+            'Vraagprijs ≠ transactieprijs · Geen automatisch kopen of verkopen.</footer>'
+            '</main></body></html>')
 
 
 def write(path,strategies,clock):
