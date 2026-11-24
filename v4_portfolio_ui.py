@@ -86,14 +86,33 @@ def render(report,now,filters=None):
                     cell(e(idea['name'])+'<small class="sub">#'+str(idea['id'])+'</small>','name')+
                     cell(e(g(idea['price_current'])),'num')+
                     cell(e(g(idea['max_price_each'])),'num')+
+                    cell((e(g(idea.get('game_ask'))) if idea.get('game_ask') is not None
+                           else 'Nog niet gemeten')+
+                         '<small class="sub">'+e(idea.get('game_check',''))+
+                         ((' · '+e(at(idea['game_checked_at']))) if idea.get('game_checked_at') else '')+
+                         '</small>')+
                     cell(e(idea.get('qty')),'num')+
                     cell(e(g(idea.get('estimated_cost'))),'num')+
                     cell(e(g(idea.get('exit_scenario'))),'num')+
                     cell(e(idea.get('reason')),'reason')+'</tr>')
     buy_table=table(['Termijn','Character','Item','TK vraagprijs','Max instap*',
-                     'Max indicatief aantal','Kosten tegen TK','Hypothetisch verkoopscenario','Waarom'],
+                     'Gameprijs op VPS (laatste save)','Max indicatief aantal','Kosten tegen TK',
+                     'Hypothetisch verkoopscenario','Waarom'],
                     buys,'Geen onderbouwde koopkansen binnen de bekende goldlimieten. '
                     'Dat is beter dan goud verspillen aan ongefundeerde signalen.')
+    checks=[]
+    for quote in (p.get('game_checks') or [])[:35]:
+        label=quote.get('name') or 'Item '+str(quote.get('id'))
+        checks.append('<tr>'+cell(e(label)+'<small class="sub">#'+
+                      str(quote['id'])+'</small>','name')+
+                      cell(e(g(quote['ask'])),'num')+
+                      cell(e(at(quote['at'])))+
+                      cell(e(quote['kind']))+
+                      cell(e(quote['price_rows']),'num')+'</tr>')
+    check_table=table(['Item','Echt gemeten game-vraagprijs','Meting in WoW',
+                       'Type','AH-prijsregels'],checks,
+                      'Nog geen AH-prijzen op de VPS. De addon controleert automatisch '
+                      'bij het openen van het AH; na een WoW-save verstuurt de bridge de resultaten.')
     term=str(filters.get('p','')).strip().lower()[:65]
     items=[x for x in (p.get('holdings') or []) if not term or term in
            str(x.get('name','')).lower() or term in str(x.get('id'))]
@@ -183,6 +202,11 @@ def render(report,now,filters=None):
             'Gebonden, uitgerust, ontbrekende en te oude gegevens tellen niet als vrij verhandelbare voorraad. '
             'Geen enkele aankoop wordt automatisch uitgevoerd. '
             'Budget per character, buffer en risico verschillen met beschikbare gold.</p>'+
+            '<h3>In-game AH-prijzen op VPS opgeslagen</h3>'+check_table+
+            '<p class="hint">Dit zijn daadwerkelijk in WoW gemeten vraagprijzen, '
+            'NIET realtime. De meting staat pas op de VPS nadat WoW SavedVariables '
+            'heeft opgeslagen bij logout of /reload. De VPS blijft intussen '
+            'publieke marktprijzen verzamelen.</p>'+
             '<h3>Wat doe ik met wat ik al bezit?</h3>'+holdings_table+
             '<p class="hint">'+e(p.get('estimated_value_warning'))+'</p>'+
             '<h3>Automatisch geregistreerde aankopen en verkopen</h3>'+trade_table+
