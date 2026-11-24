@@ -140,6 +140,43 @@ class HttpV4Tests(unittest.TestCase):
             self.req('/api/v4/research',token='wrong')
         self.assertEqual(err.exception.code,401)
 
+    def test_automatic_ah_receipts_and_unresolved_evidence_sync_replay(self):
+        stamp=self.now
+        key='acc:eu-2-110:Warrior Pump'
+        char={'character_key':key,'realm':'eu-2-110',
+              'character':'Warrior Pump','faction':'Alliance','last_seen':stamp,
+              'gold':2_000_000,'wallet_at':stamp,'bags':{},'bags_at':stamp,
+              'auctions':{},'auctions_at':stamp,
+              'mail_at':None,'mail_pending':None,'mail_ready':None,
+              'mail_attachments':None}
+        buys=[
+          {'id':'acc:AH_Warrior_1','character_key':key,
+           'at':stamp-90,'side':'BUY','item_id':12363,
+           'quantity':2,'total_copper':100000,'source':'AH_BUY'},
+          {'id':'acc:AH_Warrior_2','character_key':key,
+           'at':stamp-40,'side':'SELL','item_id':12363,
+           'quantity':1,'total_copper':80000,'source':'AH_MAIL'},
+        ]
+        issue={'id':'acc:unresolved1','character_key':key,
+               'at':stamp-10,'side':'SELL','item_id':0,
+               'quantity':1,'total_copper':50000,
+               'reason':'MAIL_ITEM_UNRESOLVED','item_name':'Uncached Pattern'}
+        payload={'schema':'FT4SYNC1','characters':[char],
+                 'sessions':[],'trades':buys,'trade_issues':[issue]}
+        response=self.req('/api/v4/sync','POST',payload)
+        self.assertEqual(response['trades_added'],2)
+        self.assertEqual(response['unresolved_trades'],1)
+        report=self.req('/api/v4/research')['portfolio']
+        self.assertEqual(report['realized_profit'],30000)
+        self.assertEqual(report['unresolved_ah_count'],1)
+        self.assertEqual(report['unresolved_ah_events'][0]['item_name'],'Uncached Pattern')
+        self.assertEqual(self.req('/api/v4/sync','POST',payload)['trades_added'],0)
+        payload['trade_issues']=[]
+        self.assertEqual(self.req('/api/v4/sync','POST',payload)['unresolved_trades'],0)
+        report=self.req('/api/v4/research')['portfolio']
+        self.assertEqual(report['unresolved_ah_count'],0)
+        self.assertEqual(report['realized_profit'],30000)
+
     def test_authentication_is_mandatory(self):
         with self.assertRaises(urllib.error.HTTPError) as err:
             self.req('/api/v4/strategies',token='wrong')
