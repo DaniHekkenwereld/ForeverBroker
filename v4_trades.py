@@ -155,7 +155,11 @@ def summarize(db,items=None,limit=60):
     records=[dict(r) for r in db.execute(query)] if exists else []
     lots={}
     for r in records:
-        key=(r['character_key'],r['item_id'])
+        # Characters sharing one WoW account can transfer items through
+        # mail/bank; carry their observed buy basis across that account.
+        # Other accounts keep strictly separate FIFO lots.
+        account=r['character_key'].split(':',1)[0]
+        key=(account,r['item_id'])
         if r['side']=='BUY':
             lots.setdefault(key,[]).append({'quantity':r['quantity'],
                 'amount':r['total_copper'],'total_qty':r['quantity'],
