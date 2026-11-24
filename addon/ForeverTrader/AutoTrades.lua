@@ -79,6 +79,9 @@ function A.login(d,realm,character,clock,money)
            intents={},lastSpend=nil,seenPurchase={}}
     A.export()
 end
+function A.ready(realm,character)
+    return state and state.realm==realm and state.character==character
+end
 function A.intent(item,qty,auctionID,kind)
     if not state or (item~=nil and not pos(item)) then return end
     local at=state.clock()
@@ -180,7 +183,33 @@ local function resolve(name)
         local id=ok and type(link)=='string' and tonumber(link:match('item:(%d+)'))
         if pos(id) then return id end
     end
-    return nil
+    -- Some Forever builds do not resolve item IDs from an invoice name.
+    -- Compare only previously observed OWN item IDs with cached client names.
+    local matched=nil
+    local visited={}
+    local inspected=0
+    for _,character in pairs((state and state.d.characters) or {}) do
+        for _,location in ipairs({'auctions','bags','bank','equipment'}) do
+            local stock=character[location]
+            if type(stock)=='table' then
+                for id,_ in pairs(stock) do
+                    if pos(id) and not visited[id] and inspected<1500 then
+                        visited[id]=true;inspected=inspected+1
+                        local label=nil
+                        if GetItemInfo then
+                            local ok,result=pcall(GetItemInfo,id)
+                            if ok then label=result end
+                        end
+                        if label==name then
+                            if matched and matched~=id then return nil end
+                            matched=id
+                        end
+                    end
+                end
+            end
+        end
+    end
+    return matched
 end
 function A.mailScan(getHeader,getInvoice,getCount)
     if not state or type(getHeader)~='function' or
