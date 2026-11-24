@@ -2,6 +2,7 @@
 local L=ForeverTraderLogic
 local T=ForeverTraderTarget
 local V4=ForeverTraderV4
+local AT=ForeverTraderAutoTrades
 local frame=CreateFrame('Frame')
 local function say(s) print('|cffe4ba63ForeverTrader:|r '..s) end
 local function now() return GetServerTime and GetServerTime() or time() end
@@ -46,6 +47,7 @@ end
 local s={active=false,mailOpen=false,ahOpen=false,mailKnown=false,ready=0,pending=0,attachments=0,partial=false,cash=0,reserve=150000,threshold=20000,buyCount=0,sellCount=0,mailAlert=false,bought=false,live=false,liveSpent=0,walletKnown=false,autoSearch=false,autoSearchCount=0}
 local plan,book,bags,buys,sells=nil,{},{},{},{}
 local listed={}
+local auctionIndex={}
 local bankStock,bankBound,bagBound,equipped={},{},{},{}
 local bankOpen=false
 local targetBook,lastTry={},{}
@@ -73,6 +75,7 @@ local function wallet()
     local f,r=market();local money=GetMoney()
     if type(money)~='number' or money<0 then return end
     if s.live and s.walletKnown and money<s.cash then s.liveSpent=s.liveSpent+s.cash-money end
+    if AT then AT.onMoney(money) end
     s.cash=money;s.walletKnown=true
     db().wallet=string.format('%d|%d|%s|%s',now(),money,f,r)
     if recordCharacter then recordCharacter('wallet') end
@@ -158,6 +161,12 @@ local function mailbox()
     s.pending=pending;s.eta=eta;s.ready=ready;s.attachments=attachments;s.partial=type(total)=='number' and total>n or false;s.unknown=unknown;s.mailKnown=true;s.lastMail=now();s.mailAlert=false;s.bought=false;s.buyBlocked=false
     db().mail=string.format('%d|%d|%d',s.lastMail,pending,ready)
     db().mail3=string.format('%d|%d|%d|%d|%d|%d',s.lastMail,pending,ready,attachments,s.partial and 1 or 0,unknown)
+    if AT then
+        AT.mailScan(
+            function(i)return GetInboxHeaderInfo(i) end,
+            function(i)return GetInboxInvoiceInfo(i) end,
+            function()return pcall(GetInboxNumItems) end)
+    end
     if recordCharacter then recordCharacter('mail') end
 end
 -- Store snapshots of ALL previously visited characters on the same account.
@@ -498,6 +507,39 @@ local function targeted(e,key)
         while #logs>500 or size>3000000 do size=size-#logs[1]-1;table.remove(logs,1) end;d.targetLog=table.concat(logs,';')
     else say('Zoekresultaat te groot voor export; lokaal advies wel bijgewerkt.') end
 end
+-- All prices captured in this index are client-observed, not assumptions.
+-- An auctionID tells us the exact item and stack size if the client returned
+-- a full item result. The purchase event + actual gold delta are still required.
+local function cacheAuctionResults(key)
+    if type(key)~='table' or type(key.itemID)~='number' or not C_AuctionHouse then return end
+    local api=C_AuctionHouse
+    if not api.GetNumItemSearchResults or not api.GetItemSearchResultInfo then return end
+    local ok,num=pcall(api.GetNumItemSearchResults,key)
+    if not ok or type(num)~='number' or num<0 or num>2000 then return end
+    for i=1,num do
+        local good,v=pcall(api.GetItemSearchResultInfo,key,i)
+        if good and type(v)=='table' and type(v.auctionID)=='number' and
+           type(v.quantity)=='number' and v.quantity>0 then
+            auctionIndex[v.auctionID]={item=key.itemID,qty=v.quantity,at=now()}
+        end
+    end
+end
+-- Passive non-taint hooks: observe standard purchases, never initiate them.
+if hooksecurefunc and C_AuctionHouse and AT then
+    if C_AuctionHouse.PlaceBid then
+        pcall(hooksecurefunc,C_AuctionHouse,'PlaceBid',function(auctionID)
+            local r=auctionIndex[auctionID]
+            if r and now()-r.at<900 then AT.intent(r.item,r.qty,auctionID,'item')
+            else AT.intent(nil,nil,auctionID,'item') end
+        end)
+    end
+    if C_AuctionHouse.StartCommoditiesPurchase then
+        pcall(hooksecurefunc,C_AuctionHouse,'StartCommoditiesPurchase',function(item,qty)
+            AT.intent(item,qty,nil,'commodity')
+        end)
+    end
+end
+
 -- Invalidate the cache as soon as another normal search starts, before any new results arrive.
 if hooksecurefunc and C_AuctionHouse and C_AuctionHouse.SendSearchQuery then
     pcall(hooksecurefunc,C_AuctionHouse,'SendSearchQuery',function(key)
@@ -583,7 +625,7 @@ local function maybeAutoSearch()
     searchNext(nil,true)
 end
 local function mailSignal() if HasNewMail then local has=HasNewMail() and true or false;if has and not s.lastMailSignal and not s.mailOpen then s.mailAlert=true end;s.lastMailSignal=has end end
-for _,event in ipairs({'PLAYER_LOGIN','PLAYER_ENTERING_WORLD','PLAYER_LOGOUT','PLAYER_MONEY','MAIL_SHOW','MAIL_CLOSED','MAIL_INBOX_UPDATE','UPDATE_PENDING_MAIL','REPLICATE_ITEM_LIST_UPDATE','AUCTION_HOUSE_SHOW','AUCTION_HOUSE_CLOSED','PLAYER_INTERACTION_MANAGER_FRAME_SHOW','PLAYER_INTERACTION_MANAGER_FRAME_HIDE','BAG_UPDATE_DELAYED','BANKFRAME_OPENED','BANKFRAME_CLOSED','PLAYERBANKSLOTS_CHANGED','PLAYERBANKBAGSLOTS_CHANGED','PLAYER_EQUIPMENT_CHANGED','OWNED_AUCTIONS_UPDATED','ITEM_PURCHASED','COMMODITY_PURCHASE_SUCCEEDED','AUCTION_HOUSE_AUCTIONS_EXPIRED','AUCTION_HOUSE_AUCTION_CREATED','ITEM_SEARCH_RESULTS_UPDATED','ITEM_SEARCH_RESULTS_ADDED','COMMODITY_SEARCH_RESULTS_UPDATED','COMMODITY_SEARCH_RESULTS_ADDED','AUCTION_HOUSE_BROWSE_RESULTS_UPDATED','AUCTION_HOUSE_BROWSE_RESULTS_ADDED'}) do pcall(frame.RegisterEvent,frame,event) end
+for _,event in ipairs({'PLAYER_LOGIN','PLAYER_ENTERING_WORLD','PLAYER_LOGOUT','PLAYER_MONEY','MAIL_SHOW','MAIL_CLOSED','MAIL_INBOX_UPDATE','UPDATE_PENDING_MAIL','REPLICATE_ITEM_LIST_UPDATE','AUCTION_HOUSE_SHOW','AUCTION_HOUSE_CLOSED','PLAYER_INTERACTION_MANAGER_FRAME_SHOW','PLAYER_INTERACTION_MANAGER_FRAME_HIDE','BAG_UPDATE_DELAYED','BANKFRAME_OPENED','BANKFRAME_CLOSED','PLAYERBANKSLOTS_CHANGED','PLAYERBANKBAGSLOTS_CHANGED','PLAYER_EQUIPMENT_CHANGED','OWNED_AUCTIONS_UPDATED','ITEM_PURCHASED','COMMODITY_PURCHASE_SUCCEEDED','COMMODITY_PURCHASED','COMMODITY_PURCHASE_FAILED','AUCTION_HOUSE_AUCTIONS_EXPIRED','AUCTION_HOUSE_AUCTION_CREATED','ITEM_SEARCH_RESULTS_UPDATED','ITEM_SEARCH_RESULTS_ADDED','COMMODITY_SEARCH_RESULTS_UPDATED','COMMODITY_SEARCH_RESULTS_ADDED','AUCTION_HOUSE_BROWSE_RESULTS_UPDATED','AUCTION_HOUSE_BROWSE_RESULTS_ADDED'}) do pcall(frame.RegisterEvent,frame,event) end
 frame:SetScript('OnEvent',function(_,e,...)
     local key=...
     check(function()
@@ -594,7 +636,11 @@ frame:SetScript('OnEvent',function(_,e,...)
             s.mailKnown=false;s.active=false;s.cash=0;s.ahOpen=false;s.mailOpen=false
             s.bankKnown=false;s.bagBoundAt=nil;s.equipmentKnown=false
             bankOpen=false;bankStock={};bankBound={};bagBound={};equipped={}
-            bags={};listed={};targetBook={}
+            bags={};listed={};targetBook={};auctionIndex={}
+            if AT then
+                local realm,character=identity()
+                if realm and character then AT.login(db(),realm,character,now,GetMoney()) end
+            end
             getBags();wallet();getEquipment()
             plan=nil
             if V4 then
@@ -604,9 +650,16 @@ frame:SetScript('OnEvent',function(_,e,...)
             else plan=L.plan(db().planText,now()) end
             mailSignal();ui:Hide()
         elseif e=='PLAYER_ENTERING_WORLD' then
+            if AT then
+                local realm,character=identity()
+                if realm and character and not s.walletKnown then
+                    AT.login(db(),realm,character,now,GetMoney())
+                end
+            end
             getBags();wallet();getEquipment()
             if V4 then ensureV4Identity('world') end
         elseif e=='PLAYER_LOGOUT' then
+            if AT then AT.onMoney(GetMoney());AT.update(true) end
             if V4 then
                 ensureV4Identity('logout')
                 V4.logout(db(),now(),s.walletKnown and s.cash or nil,bags)
@@ -635,9 +688,24 @@ frame:SetScript('OnEvent',function(_,e,...)
         elseif e=='AUCTION_HOUSE_CLOSED' then s.ahOpen=false;pending=nil;targetBook={};browseFull=false
         elseif e=='REPLICATE_ITEM_LIST_UPDATE' then scan()
         elseif e=='AUCTION_HOUSE_BROWSE_RESULTS_UPDATED' or e=='AUCTION_HOUSE_BROWSE_RESULTS_ADDED' then browseSummary()
-        elseif e=='ITEM_SEARCH_RESULTS_UPDATED' or e=='ITEM_SEARCH_RESULTS_ADDED' or e=='COMMODITY_SEARCH_RESULTS_UPDATED' or e=='COMMODITY_SEARCH_RESULTS_ADDED' then targeted(e,key)
+        elseif e=='ITEM_SEARCH_RESULTS_UPDATED' or e=='ITEM_SEARCH_RESULTS_ADDED' or e=='COMMODITY_SEARCH_RESULTS_UPDATED' or e=='COMMODITY_SEARCH_RESULTS_ADDED' then
+            if e=='ITEM_SEARCH_RESULTS_UPDATED' or e=='ITEM_SEARCH_RESULTS_ADDED' then cacheAuctionResults(key) end
+            targeted(e,key)
         elseif e=='OWNED_AUCTIONS_UPDATED' or e=='AUCTION_HOUSE_AUCTION_CREATED' then owned()
-        elseif e=='ITEM_PURCHASED' or e=='COMMODITY_PURCHASE_SUCCEEDED' then if s.active and s.ahOpen then s.bought=true;s.buyBlocked=true;targetBook={} end
+        elseif e=='ITEM_PURCHASED' then
+            if AT then AT.onMoney(GetMoney());AT.purchased(key,nil,'item') end
+            if s.active and s.ahOpen then s.bought=true;s.buyBlocked=true;targetBook={} end
+        elseif e=='COMMODITY_PURCHASED' then
+            if AT then
+                local qty=select(2,...)
+                AT.onMoney(GetMoney());AT.purchased(key,qty,'commodity')
+            end
+            if s.active and s.ahOpen then s.bought=true;s.buyBlocked=true;targetBook={} end
+        elseif e=='COMMODITY_PURCHASE_SUCCEEDED' then
+            if AT then AT.onMoney(GetMoney());AT.purchased(nil,nil,'commodity') end
+            if s.active and s.ahOpen then s.bought=true;s.buyBlocked=true;targetBook={} end
+        elseif e=='COMMODITY_PURCHASE_FAILED' then if AT then AT.failed() end
+        elseif e=='PLAYER_MONEY' then wallet()
         elseif e=='AUCTION_HOUSE_AUCTIONS_EXPIRED' then if s.active then s.mailAlert=true end
         elseif e=='BAG_UPDATE_DELAYED' then getBags();if bankOpen then getBank() end
         end;update()
@@ -650,6 +718,7 @@ local elapsed=0; frame:SetScript('OnUpdate',function(_,dt)
         if V4 and not s.loggingOut and not db().v4ActiveSession then
             check(function() ensureV4Identity('retry') end)
         end
+        if AT then check(function() AT.onMoney(GetMoney());AT.update() end) end
         if s.active then check(function() mailSignal();update();maybeAutoSearch() end) end
     end
 end)
@@ -700,25 +769,6 @@ SLASH_FOREVERTRADER1='/ft';SlashCmdList.FOREVERTRADER=function(msg)
                 ' | Export: '..(db().charactersWire and #db().charactersWire>7 and 'aanwezig' or 'leeg'))
             if not realmOK() then say('Waarschuwing: deze client is geen EU Alliance. Geen live AH-adviezen.') end
         elseif msg=='plan' then say('V4 gebruikt automatisch de serverzoeklijst. Handmatig plakken is niet nodig.')
-        elseif msg:match('^trade ') then
-            local side,item,qty,amount=msg:match('^trade (%a+) (%d+) (%d+) ([%d%.]+g?)$')
-            if not side or (side~='buy' and side~='sell') then
-                say('Gebruik: /ft trade buy 12363 2 15.25g of /ft trade sell 12363 2 18g (SELL is NET ontvangen gold).')
-                return
-            end
-            local goldAmount=amount:sub(-1)=='g'
-            local n=tonumber(goldAmount and amount:sub(1,-2) or amount)
-            local copper=n and (goldAmount and math.floor(n*10000+.5) or n) or nil
-            local realm,character=identity()
-            local id,err=V4 and V4.recordTrade(db(),now(),realm,character,
-                side:upper(),tonumber(item),tonumber(qty),copper)
-            if id then
-                say('Handmatig '..(side=='buy' and 'INKOOP' or 'VERKOOP')..
-                    ' geregistreerd: '..name(tonumber(item))..' x'..qty..
-                    ' | totaal '..goldExact(copper)..
-                    '. Alleen echte transacties invoeren; uitloggen voor VPS-sync.')
-                wallet();recordCharacter('trade')
-            else say('Transactie niet vastgelegd: '..tostring(err or 'V4 ontbreekt')) end
         elseif msg=='portfolio' or msg=='bank' then
             local realm,character=identity()
             local c=realm and character and db().characters and
@@ -744,8 +794,10 @@ SLASH_FOREVERTRADER1='/ft';SlashCmdList.FOREVERTRADER=function(msg)
             end
             say('Naar VPS: automatisch na /reload of uitloggen via de Windows-bridge.')
         elseif msg=='trades' then
-            local d=db();say('Handmatige transacties in export: '..#(d.v4Trades or {})..
-                '. /ft trade buy [itemID] [aantal] [totaal g] of sell (netto na AH-fees).')
+            local confirmed,uncertain=AT and AT.count() or 0,0
+            if AT then confirmed,uncertain=AT.count() end
+            say('Automatisch vastgelegd: '..confirmed..' AH-transacties; '..
+                uncertain..' onvolledige waarnemingen. Geen handmatige invoer.')
         elseif msg=='bought' or msg=='mail' then s.bought=true;s.buyBlocked=true;targetBook={};lastCode=nil
         elseif msg=='search' then searchNext()
         elseif msg:match('^search %d+$') then searchNext(tonumber(msg:match('%d+')))
