@@ -143,19 +143,31 @@ def parse_trade_issues(text,now,account):
         raise ValueError('Ongeldige onvolledige AH-waarnemingen')
     identity=hashlib.sha256(account.encode('utf-8')).hexdigest()[:24]
     result=[]
+    invalid=0
     for idx,line in enumerate(lines):
-        fields=line.split('|')
-        if len(fields)!=9:raise ValueError('Ongeldige onvolledige AH-regel')
-        at,realm,name,side,item,qty,amount,reason,item_name=fields
-        row=dict(id=identity+':'+hashlib.sha256(
-                (line+':'+str(idx)).encode('utf-8')).hexdigest()[:22],
-            character_key=identity+':'+realm+':'+name,
-            at=int(at),side=side,item_id=int(item),quantity=int(qty),
-            total_copper=int(amount),reason=reason,item_name=item_name)
-        import v4_trades
-        v4_trades.validate_issue(row,now)
-        result.append(row)
-    return result
+        # These are *incomplete* game observations, NOT executed orders.
+        # A malformed mail/sentinel must never prevent all character, bank
+        # and confirmed trade data from synchronising. The original
+        # SavedVariables file is left untouched for later diagnosis.
+        try:
+            fields=line.split('|')
+            if len(fields)!=9:raise ValueError('Ongeldige onvolledige AH-regel')
+            at,realm,name,side,item,qty,amount,reason,item_name=fields
+            row=dict(id=identity+':'+hashlib.sha256(
+                    (line+':'+str(idx)).encode('utf-8')).hexdigest()[:22],
+                character_key=identity+':'+realm+':'+name,
+                at=int(at),side=side,item_id=int(item),quantity=int(qty),
+                total_copper=int(amount),reason=reason,item_name=item_name)
+            import v4_trades
+            v4_trades.validate_issue(row,now)
+            result.append(row)
+        except (ValueError,TypeError,OverflowError):
+            invalid+=1
+    if invalid:
+        print('V4: '+str(invalid)+' ongeldige/onvolledige AH-waarneming(en) '
+              'overgeslagen; ruwe SavedVariables blijven bewaard. '
+              'Gold, bank en bewezen transacties synchroniseren gewoon.',flush=True)
+    return result if result or not invalid else None
 
 
 def compatible_sessions(chars,sessions,now):
