@@ -43,7 +43,7 @@ def render(report,now,filters=None):
           e(g(p.get('gold_recent_7d')))+'</strong><span>Niet zomaar overdraagbaar tussen characters</span></div>'
           '<div class="metric"><small>Voorraadindicatie op AH-vraagprijs</small><strong>'+
           e(g(p.get('portfolio_ask_mark')))+'</strong><span>Geen gegarandeerde opbrengst, nooit echte P&amp;L</span></div>'
-          '<div class="metric"><small>Handmatig vastgelegde gerealiseerde winst</small><strong>'+
+          '<div class="metric"><small>Resultaat van geregistreerde AH-transacties</small><strong>'+
           e(g(p.get('realized_profit')))+'</strong><span>Alleen verkochte lots met bekende aankoopkosten</span></div>'
           '<div class="metric"><small>Verschillende item-ID’s</small><strong>'+
           str(p.get('holding_types',0))+'</strong><span>'+
@@ -57,11 +57,15 @@ def render(report,now,filters=None):
         notices.append(str(p['wallet_missing'])+' character(s) zonder goldmeting.')
     if not p.get('market_fresh'):
         notices.append('AH-marktdata verouderd; voorraadprijzen en koopadviezen zijn niet actueel.')
-    notices.append('Kostprijzen zijn alleen bekend voor handmatig vastgelegde aankopen. '
-                   'Onbekende beginvoorraad en banktransfers hebben geen geschatte kostprijs.')
+    notices.append('Kostprijzen komen uit automatisch gemeten aankopen en eventuele oudere notities. '
+                   'Niet-meetbare transacties en transfers krijgen geen verzonnen kostprijs.')
+    if p.get('unresolved_ah_count'):
+        notices.append(str(p['unresolved_ah_count'])+
+                       ' AH-gebeurtenissen missen item, aantal of werkelijk bedrag. '
+                       'Deze zijn zichtbaar bij Onvolledige transacties en tellen niet als winst.')
     if p.get('unmatched_sales'):
         notices.append(str(p['unmatched_sales'])+
-                       ' handmatige verkoop(en) konden niet volledig aan geregistreerde aankopen worden gekoppeld.')
+                       ' verkoop(en) konden niet volledig aan geregistreerde aankopen worden gekoppeld.')
     notice=''.join('<p class="warning">'+e(x)+'</p>' for x in notices)
     chars=[]
     for c in p.get('characters') or []:
@@ -114,7 +118,7 @@ def render(report,now,filters=None):
             cell((e(g(i.get('recorded_purchase_cost'))) if
                   i.get('recorded_purchase_cost') is not None else '—')+
                  '<small class="sub">'+str(i.get('recorded_purchase_units') or 0)+
-                 ' handmatig gekochte stuks</small>','num')+
+                 ' stuks met gemeten kostprijs</small>','num')+
             cell(e(g(i.get('week_median'))),'num')+
             cell(e(i.get('volume_24h')),'num')+
             cell('<span class="state '+color+'">'+e(i.get('advice'))+'</span>')+'</tr>')
@@ -149,13 +153,28 @@ def render(report,now,filters=None):
         journal.append('<tr>'+cell(e(at(trade['happened_at'])))+
                        cell(e(trade.get('character')))+
                        cell(e(status))+
+                       cell(e('Automatisch AH' if trade.get('source') in ('AH_BUY','AH_MAIL')
+                              else 'Oude registratie'))+
                        cell('Item '+str(trade['item_id']),'name')+
                        cell(str(trade['quantity']),'num')+
                        cell(e(g(trade['total_copper'])),'num')+
                        cell(pnl,'num')+'</tr>')
-    trade_table=table(['Tijd','Character','Actie','Item-ID','Aantal',
-                       'Totaal ingevoerd','Gerealiseerd resultaat (bekende lots)'],
-                      journal,'Nog geen handmatig bevestigde transacties.')
+    trade_table=table(['Tijd','Character','Actie','Bron','Item-ID','Aantal',
+                       'Werkelijk bedrag','Gerealiseerd resultaat (bekende lots)'],
+                      journal,'Nog geen afgeronde AH-transacties met compleet bewijs opgeslagen.')
+    issues=[]
+    for x in p.get('unresolved_ah_events') or []:
+        item=x.get('item_name') or ('Item '+str(x.get('item_id'))
+                                 if x.get('item_id') else 'Item nog niet bekend')
+        issues.append('<tr>'+cell(e(at(x.get('at'))))+
+                      cell(e(x.get('character')))+cell(e(x.get('side')))+
+                      cell(e(item),'name')+
+                      cell(e(x.get('quantity')),'num')+
+                      cell(e(g(x.get('total_copper'))),'num')+
+                      cell(e(x.get('reason')),'reason')+'</tr>')
+    issue_table=table(['Waargenomen','Character','Type','Item','Aantal','Bedrag',
+                       'Wat ontbreekt?'],issues,
+                      'Geen onvolledige AH-transacties geregistreerd.')
     theme_table=table(['Item','Mogelijke katalysator','TK-vraagprijs','Volume','7d mediaan','Prijs vs week','Wat doen?','Eigen stuks','Raidmijlpaal','Reden + onzekerheid'],
                       themes,'Geen thematische watchlist.')
     return ('<div class="sectionhead"><div><h2>Jouw totale portfolio</h2>'
@@ -169,13 +188,13 @@ def render(report,now,filters=None):
             'Budget per character, buffer en risico verschillen met beschikbare gold.</p>'+
             '<h3>Wat doe ik met wat ik al bezit?</h3>'+holdings_table+
             '<p class="hint">'+e(p.get('estimated_value_warning'))+'</p>'+
-            '<h3>Geregistreerde echte transacties</h3>'+trade_table+
-            '<p class="hint">Na een aankoop in WoW: <code>/ft trade buy 12363 2 15.25g</code> '
-            '(2 stuks, totaal 15g25s betaald). '
-            'Na verkoop: <code>/ft trade sell 12363 2 18g</code> '
-            '(18g NET ontvangen na AH-kosten). '
-            'Log daarna uit zodat de bridge synchroniseert. '
-            'Een transactie invoeren verandert je echte gold of voorraad niet.</p>'+
+            '<h3>Automatisch geregistreerde aankopen en verkopen</h3>'+trade_table+
+            '<p class="hint">De addon registreert aankopen bij een succesvolle AH-aankoop met '
+            'bijbehorende gold-uitgave. Verkopen telt hij pas bij een afgeronde '
+            'seller-factuur in je WoW-mailbox. Open je mailbox normaal om de '
+            'facturen te laten uitlezen; je hoeft niets per item in te voeren. '
+            'De bridge synchroniseert bij de volgende WoW-save.</p>'+
+            '<h3>Onvolledige transacties (niet meegerekend als winst)</h3>'+issue_table+
             '<h3>Speculatieve tier- en raidthema’s</h3>'+theme_table+
             '<p class="hint">Zonder bevestigde tierdatum of bewezen oorzakelijk verband zijn dit '
             'onderzoeksthema’s, GEEN koopadviezen. </p>')
