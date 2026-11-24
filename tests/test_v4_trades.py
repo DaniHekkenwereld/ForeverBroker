@@ -72,6 +72,46 @@ class TradeLedgerTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             v4_bridge.parse_trades(text.replace('|1800000000|BUY','|1800000700|BUY'),1800000100,'account-one')
 
+    def test_automatic_game_receipts_and_unresolved_mail_wire(self):
+        raw=('ForeverTraderDB = {\n'
+             ' ["autoTradesWire"] = "FTTRADE2;AH_Mage_1800000000_1|eu-2-110|'
+             'Mage Pump|1800000000|BUY|12363|2|100000|AH_BUY;'
+             'AH_Mage_1800000005_2|eu-2-110|Mage Pump|1800000005|'
+             'SELL|12363|1|80000|AH_MAIL",\n'
+             ' ["autoTradeIssuesWire"] = "FTISSUE2;1800000010|eu-2-110|Mage Pump'
+             '|SELL|0|3|25000|MAIL_ITEM_UNRESOLVED|Unknown Recipe",\n}\n')
+        trades=v4_bridge.parse_trades(raw,self.now,'account-one')
+        self.assertEqual(len(trades),2)
+        self.assertEqual([r['source'] for r in trades],['AH_BUY','AH_MAIL'])
+        issues=v4_bridge.parse_trade_issues(raw,self.now,'account-one')
+        self.assertEqual(len(issues),1)
+        self.assertEqual(issues[0]['item_name'],'Unknown Recipe')
+        self.assertEqual(issues[0]['total_copper'],25000)
+        self.assertIsNone(v4_bridge.parse_trade_issues('ForeverTraderDB={}',self.now,'account-one'))
+        self.assertEqual(v4_trades.store(self.db,
+            [{**row,'character_key':self.key} for row in trades],
+            self.now,{self.key}),2)
+        s=v4_trades.summarize(self.db)
+        self.assertEqual(s['reported_realized_net'],30000)
+        self.assertEqual(v4_trades.store(self.db,
+            [{**row,'character_key':self.key} for row in trades],
+            self.now,{self.key}),0)
+        self.assertEqual(v4_trades.sync_issues(self.db,
+            [{**issues[0],'character_key':self.key}],{self.key}),1)
+        self.assertEqual(len(v4_trades.recent_issues(self.db)),1)
+        self.assertEqual(v4_trades.sync_issues(self.db,[],{self.key}),0)
+        self.assertEqual(v4_trades.recent_issues(self.db),[])
+
+    def test_ambiguous_buy_event_cannot_become_fake_trade(self):
+        raw=('ForeverTraderDB = {\n'
+             ' ["autoTradeIssuesWire"] = "FTISSUE2;1800000000|eu-2-110'
+             '|Mage Pump|BUY|12363|0|0|COST_UNCONFIRMED|",\n}')
+        self.assertEqual(v4_bridge.parse_trades(raw,self.now,'account-one'),[])
+        issue=v4_bridge.parse_trade_issues(raw,self.now,'account-one')[0]
+        self.assertEqual(issue['side'],'BUY')
+        self.assertEqual(issue['total_copper'],0)
+        self.assertEqual(v4_trades.summarize(self.db)['trade_count'],0)
+
     def test_trade_must_belong_to_known_character(self):
         with self.assertRaises(ValueError):
             v4_trades.store(self.db,[self.row('x','BUY',1,10000)],self.now,{'another'})
