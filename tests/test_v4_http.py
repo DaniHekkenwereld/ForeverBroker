@@ -65,6 +65,35 @@ class HttpV4Tests(unittest.TestCase):
         self.assertEqual(resp['strategies'][0]['character'],'Mage')
         self.assertTrue(resp['strategies'][0]['plan'].startswith('FT3|eu-2-110|'))
         self.assertIn('1234:0:0:0:0',resp['strategies'][0]['plan'])
+    def test_saved_wow_ah_price_reaches_vps_and_research_without_duplicate(self):
+        stamp=self.now
+        char={'character_key':'acct:eu-2-110:Dien Pump',
+              'realm':'eu-2-110','character':'Dien Pump',
+              'faction':'Alliance','last_seen':stamp,
+              'gold':650000,'wallet_at':stamp,
+              'bags':{},'bags_at':stamp,'auctions':{},'auctions_at':stamp,
+              'mail_at':None,'mail_pending':None,'mail_ready':None,
+              'mail_attachments':None}
+        price={'id':1234,'at':stamp-20,'kind':'item','ask':8500,
+               'units':7,'price_rows':2}
+        data={'schema':'FT4SYNC1','characters':[char],
+              'sessions':[],'game_quotes':[price]}
+        first=self.req('/api/v4/sync','POST',data)
+        self.assertTrue(first['ok'])
+        self.assertEqual(first['game_quotes_added'],1)
+        self.assertEqual(self.req('/api/v4/sync','POST',data)['game_quotes_added'],0)
+        research=self.req('/api/v4/research')
+        self.assertEqual(research['game_checks'][0]['id'],1234)
+        self.assertEqual(research['game_checks'][0]['ask'],8500)
+        self.assertEqual(research['portfolio']['game_checks'][0]['price_rows'],2)
+        data['game_quotes'][0]['ask']=-1
+        with self.assertRaises(urllib.error.HTTPError) as ctx:
+            self.req('/api/v4/sync','POST',data)
+        self.assertEqual(ctx.exception.code,400)
+        # A broken quote batch must not destroy already-synced inventory.
+        research=self.req('/api/v4/research')
+        self.assertEqual(research['portfolio']['characters'][0]['character'],'Dien Pump')
+
     def test_forever_full_name_sync_roundtrip(self):
         stamp=self.now
         char={'character_key':'acchash:eu-2-110:Warrior Pump',
