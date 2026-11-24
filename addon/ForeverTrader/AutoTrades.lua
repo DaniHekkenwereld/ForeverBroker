@@ -238,7 +238,8 @@ function A.mailScan(getHeader,getInvoice,getCount)
                 -- they remain unresolved rather than double booked.
                 local expiry=type(daysLeft)=='number' and daysLeft>=0 and
                     (now+daysLeft*86400) or nil
-                local signature=safe(name)..':'..safe(qty)..':'..safe(net)..':'..
+                local signature=safe(state.realm)..'#'..safe(state.character)..':'..
+                    safe(name)..':'..safe(qty)..':'..safe(net)..':'..
                     safe(sender)..':'..safe(subject)
                 local matches=d.autoMailSeen[signature]
                 if type(matches)~='table' then matches={};d.autoMailSeen[signature]=matches end
