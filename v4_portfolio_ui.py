@@ -73,7 +73,8 @@ def render(report,now,filters=None):
              cell(e(g(c.get('gold'))),'num')+
              cell(e(sync)+'<small class="sub">'+e(at(c.get('wallet_at')))+'</small>')+
              cell(str(c.get('bag_types',0))+' itemtypes<small class="sub">'+e(at(c.get('bags_at')))+'</small>')+
-             cell(str(c.get('bank_types',0))+' itemtypes<small class="sub">'+e(bank)+'</small>')+
+             cell((str(c.get('bank_types',0))+' itemtypes' if c.get('bank_checked') else '—')+
+                  '<small class="sub">'+e(bank)+'</small>')+
              cell(str(c.get('auction_types',0))+' itemtypes<small class="sub">'+e(at(c.get('auctions_at')))+'</small>')+
              cell(str(c.get('equipment_types',0))+' itemtypes<small class="sub">'+e(at(c.get('equipment_at')))+'</small>')+
              cell(e(g(a.get('investable')))+'<small class="sub">Indicatie, niet automatisch te besteden</small>','num')+'</tr>')
