@@ -125,6 +125,28 @@ class TradeLedgerTests(unittest.TestCase):
         self.assertEqual(v4_trades.sync_issues(self.db,[],{self.key}),0)
         self.assertEqual(v4_trades.recent_issues(self.db),[])
 
+    def test_pending_seller_invoice_negative_deposit_and_unknown_quantity(self):
+        # Real game mail can briefly report 0 received money while a
+        # refundable deposit is populated; quantity may be -1 sentinel.
+        # This was the user's 'Invalid issue quantity/value' sync blocker.
+        raw=('ForeverTraderDB = {\n'
+             ' ["autoTradeIssuesWire"] = "FTISSUE2;1800000005|eu-2-110'
+             '|Mage Pump|SELL|12363|-1|-500|MAIL_QUANTITY_UNRESOLVED'
+             '|Arcane Crystal",\n}')
+        parsed=v4_bridge.parse_trade_issues(raw,self.now,'account-one')
+        self.assertEqual(len(parsed),1)
+        self.assertEqual(parsed[0]['quantity'],-1)
+        self.assertEqual(parsed[0]['total_copper'],-500)
+        stored={**parsed[0],'character_key':self.key}
+        self.assertEqual(v4_trades.sync_issues(self.db,[stored],{self.key}),1)
+        self.assertEqual(v4_trades.recent_issues(self.db)[0]['total_copper'],-500)
+        self.assertEqual(v4_trades.summarize(self.db)['trade_count'],0)
+        self.assertEqual(v4_trades.summarize(self.db)['reported_realized_net'],None)
+        # A completed trade with these negative values is still forbidden.
+        with self.assertRaises(ValueError):
+            v4_trades.validate({**self.row('negative','SELL',1,10000),
+                                'total_copper':-500},self.now)
+
     def test_ambiguous_buy_event_cannot_become_fake_trade(self):
         raw=('ForeverTraderDB = {\n'
              ' ["autoTradeIssuesWire"] = "FTISSUE2;1800000000|eu-2-110'
