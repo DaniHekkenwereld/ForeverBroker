@@ -147,6 +147,21 @@ class TradeLedgerTests(unittest.TestCase):
             v4_trades.validate({**self.row('negative','SELL',1,10000),
                                 'total_copper':-500},self.now)
 
+    def test_corrupted_ah_issue_does_not_block_valid_evidence_or_portfolio(self):
+        raw=('ForeverTraderDB = {\n'
+             ' ["autoTradeIssuesWire"] = "FTISSUE2;1800000005|eu-2-110|'
+             'Mage Pump|SELL|0|unknown|-500|MAIL_NET_UNCONFIRMED|Arcane Crystal;'
+             '1800000006|eu-2-110|Mage Pump|BUY|12363|0|0|'
+             'COST_UNCONFIRMED|",\n}')
+        parsed=v4_bridge.parse_trade_issues(raw,self.now,'account-one')
+        self.assertEqual(len(parsed),1)
+        self.assertEqual(parsed[0]['side'],'BUY')
+        self.assertEqual(parsed[0]['total_copper'],0)
+        self.assertEqual(v4_trades.summarize(self.db)['trade_count'],0)
+        bad_only=raw.replace(';1800000006|eu-2-110|Mage Pump|BUY|'
+                             '12363|0|0|COST_UNCONFIRMED|','')
+        self.assertIsNone(v4_bridge.parse_trade_issues(bad_only,self.now,'account-one'))
+
     def test_ambiguous_buy_event_cannot_become_fake_trade(self):
         raw=('ForeverTraderDB = {\n'
              ' ["autoTradeIssuesWire"] = "FTISSUE2;1800000000|eu-2-110'
