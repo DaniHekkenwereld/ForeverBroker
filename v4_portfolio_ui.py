@@ -50,9 +50,6 @@ def render(report,now,filters=None):
           str(p.get('unpriced_holding_types',0))+' niet betrouwbaar te prijzen</span></div>'
           '</div>')
     notices=[]
-    if p.get('bank_not_seen'):
-        notices.append(str(p['bank_not_seen'])+' character(s) hebben nog geen bankmeting. '
-                       'Open op elk character eenmaal de bank en log daarna uit.')
     if p.get('wallet_missing'):
         notices.append(str(p['wallet_missing'])+' character(s) zonder goldmeting.')
     if not p.get('market_fresh'):
@@ -71,7 +68,7 @@ def render(report,now,filters=None):
     for c in p.get('characters') or []:
         a=c.get('allocation') or {}
         sync=('Recent' if c.get('wallet_fresh') else 'Oud/onbekend')
-        bank=('Nog openen' if not c.get('bank_checked') else at(c.get('bank_at')))
+        bank=('Niet gescand (optioneel)' if not c.get('bank_checked') else at(c.get('bank_at')))
         chars.append('<tr>'+cell(e(c.get('character')),'name')+
              cell(e(g(c.get('gold'))),'num')+
              cell(e(sync)+'<small class="sub">'+e(at(c.get('wallet_at')))+'</small>')+
