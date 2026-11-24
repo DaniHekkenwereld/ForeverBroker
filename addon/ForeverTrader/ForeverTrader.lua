@@ -627,7 +627,7 @@ end
 local function mailSignal() if HasNewMail then local has=HasNewMail() and true or false;if has and not s.lastMailSignal and not s.mailOpen then s.mailAlert=true end;s.lastMailSignal=has end end
 for _,event in ipairs({'PLAYER_LOGIN','PLAYER_ENTERING_WORLD','PLAYER_LOGOUT','PLAYER_MONEY','MAIL_SHOW','MAIL_CLOSED','MAIL_INBOX_UPDATE','UPDATE_PENDING_MAIL','REPLICATE_ITEM_LIST_UPDATE','AUCTION_HOUSE_SHOW','AUCTION_HOUSE_CLOSED','PLAYER_INTERACTION_MANAGER_FRAME_SHOW','PLAYER_INTERACTION_MANAGER_FRAME_HIDE','BAG_UPDATE_DELAYED','BANKFRAME_OPENED','BANKFRAME_CLOSED','PLAYERBANKSLOTS_CHANGED','PLAYERBANKBAGSLOTS_CHANGED','PLAYER_EQUIPMENT_CHANGED','OWNED_AUCTIONS_UPDATED','ITEM_PURCHASED','COMMODITY_PURCHASE_SUCCEEDED','COMMODITY_PURCHASED','COMMODITY_PURCHASE_FAILED','AUCTION_HOUSE_AUCTIONS_EXPIRED','AUCTION_HOUSE_AUCTION_CREATED','ITEM_SEARCH_RESULTS_UPDATED','ITEM_SEARCH_RESULTS_ADDED','COMMODITY_SEARCH_RESULTS_UPDATED','COMMODITY_SEARCH_RESULTS_ADDED','AUCTION_HOUSE_BROWSE_RESULTS_UPDATED','AUCTION_HOUSE_BROWSE_RESULTS_ADDED'}) do pcall(frame.RegisterEvent,frame,event) end
 frame:SetScript('OnEvent',function(_,e,...)
-    local key=...
+    local key,extra=...
     check(function()
         if e=='PLAYER_LOGIN' then
             ensureAuctionatorListener()
@@ -697,8 +697,7 @@ frame:SetScript('OnEvent',function(_,e,...)
             if s.active and s.ahOpen then s.bought=true;s.buyBlocked=true;targetBook={} end
         elseif e=='COMMODITY_PURCHASED' then
             if AT then
-                local qty=select(2,...)
-                AT.onMoney(GetMoney());AT.purchased(key,qty,'commodity')
+                AT.onMoney(GetMoney());AT.purchased(key,extra,'commodity')
             end
             if s.active and s.ahOpen then s.bought=true;s.buyBlocked=true;targetBook={} end
         elseif e=='COMMODITY_PURCHASE_SUCCEEDED' then
