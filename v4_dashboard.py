@@ -195,7 +195,7 @@ def scan_section(activity,report,now):
     table=('<div class="tablewrap"><table><thead><tr><th>Tijd</th><th>Gebeurtenis</th>'
            '<th>Item</th><th>Laagste AH-prijs / stuk</th><th>Prijsregels</th></tr></thead>'
            '<tbody>'+''.join(rows)+'</tbody></table></div>' if rows else
-           '<p>Er is nog geen zoekgeschiedenis opgeslagen. In WoW: /ft auto status.</p>')
+           '<p>Nog geen opgeslagen gameprijsmetingen. De addon begint automatisch bij AH-openen; de bridge uploadt bij de volgende WoW-save.</p>')
     return notice+recent+table
 
 
@@ -325,8 +325,8 @@ def render(strategies,refreshed,research=None,activity=None,filters=None):
                 scan_section(activity,research,refreshed))
     details=('<p class="hint">Vernieuwt iedere 30 seconden vanuit de VPS. '
              'De bron zelf publiceert ongeveer één keer per uur. '
-             'WoW schrijft zoeklogs alleen bij /reload of uitloggen naar schijf. '
-             'Tijdens het spelen zie je realtime voortgang met <b>/ft auto status</b>.</p>')
+             'WoW schrijft zoeklogs bij /reload of uitloggen. De bridge slaat ze dan automatisch op de VPS op. '
+             'Tijdens het spelen controleert de addon vanzelf zodra het AH opent.</p>')
     return ('<!doctype html><html lang="nl"><head><meta charset="utf-8">'
             '<meta name="viewport" content="width=device-width,initial-scale=1">'
             '<title>ForeverTrader · Market Desk</title><style>'+CSS+'</style></head><body>'
