@@ -20,7 +20,26 @@ if ([string]::IsNullOrWhiteSpace($token)) {
     throw 'VPS is bijgewerkt, maar de Windows-token ontbreekt. Gebruik KOPPEL-V4.bat.'
 }
 Write-Host 'Nieuwe investerings-API controleren via HTTPS...' -ForegroundColor Cyan
-$research=Invoke-RestMethod -Uri "https://$hostIp/api/v4/research" -Headers @{Authorization="Bearer $token"} -TimeoutSec 40
+# systemctl "active" does not mean the Python socket and reverse proxy are
+# ready after a restart. Retry only transient gateway/startup failures.
+$research = $null
+for ($attempt = 1; $attempt -le 5; $attempt++) {
+    try {
+        $research = Invoke-RestMethod -Uri "https://$hostIp/api/v4/research" -Headers @{Authorization="Bearer $token"} -TimeoutSec 20
+        break
+    } catch {
+        $status = $null
+        if ($_.Exception.Response) {
+            $status = [int]$_.Exception.Response.StatusCode
+        }
+        if (($status -and $status -notin @(502, 503, 504)) -or $attempt -eq 5) {
+            Write-Warning 'VPS herstart, maar HTTPS-API is niet gezond. Controleer VPS-service en logs; geen herinstallatie nodig.'
+            throw
+        }
+        Write-Host "API nog niet klaar (HTTP $status); opnieuw controleren ($attempt/5)..." -ForegroundColor Yellow
+        Start-Sleep -Seconds 4
+    }
+}
 if ($research.version -ne '4.0.0' -or $research.market -ne 'eu-2-110') {
     throw 'De VPS gaf niet de verwachte marktanalyse.'
 }
