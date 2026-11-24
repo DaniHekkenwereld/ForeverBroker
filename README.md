@@ -8,7 +8,7 @@
 - **Investeringsradar:** korte en lange prijsontwikkelingen, historische instapmomenten, risico, liquiditeit en risicogewogen goldbudgetten per character.
 - **Daghandel:** ochtend kopen/avond verkopen alleen bij voldoende op meerdere complete dagen aangetroffen prijspatronen; niet op basis van een losse voorspelling.
 - **Raid-/tieronderzoek:** thema's voor Arcanite, enchanting-materialen en consumables, met speculatieve prijsimpact duidelijk apart van officiële data.
-- **Echte transacties bijhouden:** optioneel na een echte inkoop `/ft trade buy 12363 2 15.25g` of na werkelijke netto verkoop `/ft trade sell 12363 2 18g`; FIFO-kostprijzen voor alleen bekende handmatige transacties.
+- **Automatische handelstransacties:** de addon herkent AH-aankoopbevestigingen met bijbehorende echte gold-uitgaven, registreert verkopersfacturen bij het openen van de mailbox en synchroniseert de transacties. Geen commando of invoer per item. Niet volledig vast te stellen facturen/aankopen blijven afzonderlijk als onzeker bewijs zichtbaar.
 - **AH-verificatie:** `/ft auto on` zoekt de VPS-kandidaten; `/ft auto status` toont exacte game-zoekactiviteit. Aankopen en verkopen zelf uitvoeren.
 
 **Beperking:** TK publiceert doorgaans een marktsnapshot per uur. SavedVariables worden pas bij logout of /reload naar Windows geschreven, zodat tijdens het spelen geen live bank- of portfolio-synchronisatie mogelijk is. Vraagprijs en scenario zijn niet hetzelfde als gegarandeerde verkoopwinst. De beta is automatisch getest met Python-/Lua-regressies; een echte WoW Forever-clientsessie blijft noodzakelijk voor definitieve validatie.
