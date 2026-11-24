@@ -228,7 +228,7 @@ function A.mailScan(getHeader,getInvoice,getCount)
                     if pos(item) and pos(qty) and pos(net) then
                         commit('SELL',item,qty,net,'AH_MAIL',now)
                         existing.status='resolved'
-                        if existing.issue then existing.issue.resolved=true end
+                        if existing.issue then existing.issue.resolved=true;A.export() end
                     elseif existing.status=='new' then
                         existing.issue=recordError('SELL',item,qty,net,
                             not pos(item) and 'MAIL_ITEM_UNRESOLVED' or
@@ -252,5 +252,9 @@ function A.mailScan(getHeader,getInvoice,getCount)
 end
 function A.count()
     if not state then return 0,0 end
-    return #(state.d.autoTrades or {}),#(state.d.autoTradeIssues or {})
+    local unresolved=0
+    for _,issue in ipairs(state.d.autoTradeIssues or {}) do
+        if not issue.resolved then unresolved=unresolved+1 end
+    end
+    return #(state.d.autoTrades or {}),unresolved
 end
