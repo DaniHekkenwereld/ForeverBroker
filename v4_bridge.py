@@ -24,7 +24,7 @@ import v4_dashboard
 import v4_engine
 import v4_server
 
-AUTO_TRADE_WIRE=re.compile(r'^\s*\["autoTradesWire"\]\s*=\s*"([0-9A-Za-z|:;_. -]{1,59000})"\s*,?\s*$',re.M)
+AUTO_TRADE_WIRE=re.compile(r'^\s*\["autoTradesWire"\]\s*=\s*"([^"\\]{1,59000})"\s*,?\s*$',re.M)
 AUTO_ISSUE_WIRE=re.compile(r'^\s*\["autoTradeIssuesWire"\]\s*=\s*"([^"\\]{1,19500})"\s*,?\s*$',re.M)
 TRADE_WIRE=re.compile(r'^\s*\["tradesWire"\]\s*=\s*"([0-9A-Za-z|:;_. -]{1,59000})"\s*,?\s*$',re.M)
 SESSION=re.compile(r'^\s*\["sessionsWire"\]\s*=\s*"([^"\\]{1,49000})"\s*,?\s*$',re.M)
