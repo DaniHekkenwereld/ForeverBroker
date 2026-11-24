@@ -83,7 +83,12 @@ def validate_issue(row,clock):
         if type(row.get(key)) is not int:raise ValueError('Invalid issue integer')
     if not 0<row['at']<=clock+300 or not 0<=row['item_id']<=10000000:
         raise ValueError('Invalid issue item/time')
-    if not 0<=row['quantity']<=100000 or not 0<=row['total_copper']<=9007199254740991:
+    # Unresolved AH *observations* may contain negative sentinel quantities
+    # or a temporary negative mail amount (money received minus returned
+    # deposit). This is not a confirmed trade, so preserve the raw signed
+    # evidence for review instead of blocking all character/portfolio sync.
+    # validate() remains strict: real BUY/SELL transactions MUST be positive.
+    if not -100000<=row['quantity']<=100000 or not -9007199254740991<=row['total_copper']<=9007199254740991:
         raise ValueError('Invalid issue quantity/value')
     if type(row.get('item_name')) is not str or len(row['item_name'])>240:
         raise ValueError('Invalid issue item name')
