@@ -76,12 +76,12 @@ function A.login(d,realm,character,clock,money)
            intents={},lastSpend=nil,seenPurchase={}}
     A.export()
 end
-function A.intent(item,qty,auctionID)
+function A.intent(item,qty,auctionID,kind)
     if not state or not pos(item) then return end
     local at=state.clock()
     -- A new purchase intent never authorizes a ledger record by itself.
     local entry={at=at,item=item,qty=pos(qty) and qty or nil,
-                 auctionID=auctionID,confirmed=false,spent=nil}
+                 auctionID=auctionID,kind=kind,confirmed=false,spent=nil}
     state.intents[#state.intents+1]=entry
     while #state.intents>15 do table.remove(state.intents,1) end
 end
@@ -106,13 +106,16 @@ function A.onMoney(value)
         state.lastSpend={at=clock,amount=difference}
     end
 end
-function A.purchased(item,qty)
+function A.purchased(item,qty,kind)
     if not state then return end
     local at=state.clock()
     local found=nil
     for i=#state.intents,1,-1 do
         local entry=state.intents[i]
-        if not entry.confirmed and at-entry.at>=0 and at-entry.at<=15
+        if at-entry.at>=0 and at-entry.at<=15
+            and (not kind or not entry.kind or kind==entry.kind)
+            and (not entry.confirmed or (entry.confirmedAt and
+                at-entry.confirmedAt<=2))
             and (not pos(item) or entry.item==item) then
             found=entry;break
         end
@@ -122,7 +125,7 @@ function A.purchased(item,qty)
             recordError('BUY',0,qty,0,'PURCHASE_WITHOUT_ITEM_ID',at)
             return
         end
-        found={item=item,qty=qty,at=at,confirmed=false}
+        found={item=item,qty=qty,at=at,kind=kind,confirmed=false}
         state.intents[#state.intents+1]=found
     end
     found.confirmed=true
