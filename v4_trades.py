@@ -108,6 +108,8 @@ def sync_issues(db,entries,known_chars):
 
 
 def recent_issues(db,limit=70):
+    table=db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='v4_trade_issues'").fetchone()
+    if not table:return []
     return [dict(row) for row in db.execute(
         'SELECT * FROM v4_trade_issues ORDER BY at DESC, issue_id LIMIT ?',(limit,))]
 
