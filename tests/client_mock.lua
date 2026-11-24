@@ -30,6 +30,15 @@ local function widget()
     end})
 end
 function CreateFrame(...) local frame=widget();frames[#frames+1]=frame;return frame end
+function hooksecurefunc(tab,key,listener)
+    if type(tab)~='table' or type(tab[key])~='function' then return end
+    local original=tab[key]
+    tab[key]=function(...)
+        local out={original(...)}
+        listener(...)
+        return table.unpack(out)
+    end
+end
 Auctionator={
     EventBus={Register=function(self,listener,registered)self.listener=listener;self.event=registered[1] end},
     IncrementalScan={Events={ScanComplete='incremental_scan_complete'}}
@@ -53,6 +62,8 @@ C_AuctionHouse={
     GetReplicateItemInfo=function()return 'Linen',1,5,1,true,1,'',0,0,500,0,nil,nil,nil,nil,0,2589,true end,
     HasFullOwnedAuctionResults=function()return true end,
     GetOwnedAuctions=function()return {} end,
+    PlaceBid=function()end,
+    StartCommoditiesPurchase=function()end,
     HasFullItemSearchResults=function()return true end,
     GetNumItemSearchResults=function()return 1 end,
     GetItemSearchResultInfo=function(key,i)return {quantity=5,containsOwnerItem=false,containsAccountItem=false,buyoutAmount=500,auctionID=77} end,
@@ -168,6 +179,17 @@ frames[1].scripts.OnUpdate(frames[1],5)
 assert(C_AuctionHouse.searchCount==after,'auto queue must pause when a buy signal is actionable')
 SlashCmdList.FOREVERTRADER('auto off')
 assert(not (C_AuctionHouse.searchCount>after),'auto off no more searches')
+-- Real addon integration: observed auctionID, protected hook, gold expense
+-- and ITEM_PURCHASED must yield a complete automatic purchase receipt.
+C_AuctionHouse.PlaceBid(77,500)
+currentMoney=currentMoney-500
+fire('PLAYER_MONEY')
+fire('ITEM_PURCHASED',2589)
+clock=clock+3
+frames[1].scripts.OnUpdate(frames[1],5)
+assert(ForeverTraderDB.autoTradesWire and
+       ForeverTraderDB.autoTradesWire:find('|BUY|2589|5|500|AH_BUY',1,true),
+       'actual AH purchase must be recorded without a slash command')
 SlashCmdList.FOREVERTRADER('live on')
 assert(ForeverTraderDB.wallet:match('|Alliance|3$'))
 fire('ITEM_PURCHASED');assert(ForeverTraderDB.coach:match('|MAIL|'))
