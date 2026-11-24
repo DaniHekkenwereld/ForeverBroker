@@ -53,9 +53,21 @@ local function header(i)
 end
 A.mailScan(header,invoice,getCount)
 assert(#d.autoTrades==2,'pending sale invoices are not completed sales')
-mailbox[1].kind='seller';mailbox[1].received=14500
+-- The game can temporarily expose seller invoices with a negative / unknown
+-- quantity and no received money while the refundable deposit is populated.
+-- These observations must NOT block account sync or register fake profit.
+mailbox[1].kind='seller';mailbox[1].qty=-1;mailbox[1].received=0
+A.mailScan(header,invoice,getCount)
+assert(#d.autoTrades==2,'negative preliminary invoice is not a sale')
+assert(d.autoTradeIssuesWire:find('|SELL|12363|-1|-500|MAIL_QUANTITY_UNRESOLVED',1,true),
+       'preserve signed provisional quantity and negative deposit in diagnostic wire')
+local _,provisionalIssues=A.count()
+mailbox[1].qty=2;mailbox[1].received=14500
 A.mailScan(header,invoice,getCount)
 assert(#d.autoTrades==3,'completed seller invoice must automatically record sale')
+local _,resolvedIssues=A.count()
+assert(resolvedIssues==provisionalIssues-1,
+       'finalized invoice must reconcile its old negative provisional observation')
 assert(d.autoTrades[3][5]=='SELL' and d.autoTrades[3][6]==12363 and
        d.autoTrades[3][7]==2 and d.autoTrades[3][8]==14000,
        'seller proceeds should exclude returned refundable deposit')
