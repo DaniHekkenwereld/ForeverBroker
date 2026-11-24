@@ -50,3 +50,5 @@ jobs:
         run: lua tests/client_mock.lua
       - name: V4 session and strategy tests
         run: lua tests/v4_mock.lua
+      - name: Automatic AH purchases and mailbox sale accounting tests
+        run: lua tests/auto_trades_mock.lua
