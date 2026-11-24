@@ -4,12 +4,12 @@
 
 **Bestaande Windows-installatie morgen gebruiken:** sluit WoW, voer eerst `UPDATE.bat` uit en daarna `BETA-START.bat`. Dit werkt de Windows-addon en VPS bij, voert regressietests uit, synchroniseert en opent het dashboard. SSH/sudo kan om wachtwoorden vragen.
 
-- **Jouw portfolio:** gold, tassen inclusief gebonden items, bank en banktassen, uitgeruste items en eigen AH-veilingen, met per-character tijdstempels. Open de bank op elk character minstens één keer en log uit zodat WoW zijn SavedVariables wegschrijft.
+- **Jouw portfolio:** gold, tassen inclusief gebonden items, bank en banktassen, uitgeruste items en eigen AH-veilingen, met per-character tijdstempels. Bank openen is optioneel, alleen wanneer dat character bankitems heeft; log uit zodat WoW zijn SavedVariables wegschrijft.
 - **Investeringsradar:** korte en lange prijsontwikkelingen, historische instapmomenten, risico, liquiditeit en risicogewogen goldbudgetten per character.
 - **Daghandel:** ochtend kopen/avond verkopen alleen bij voldoende op meerdere complete dagen aangetroffen prijspatronen; niet op basis van een losse voorspelling.
 - **Raid-/tieronderzoek:** thema's voor Arcanite, enchanting-materialen en consumables, met speculatieve prijsimpact duidelijk apart van officiële data.
 - **Automatische handelstransacties:** de addon herkent AH-aankoopbevestigingen met bijbehorende echte gold-uitgaven, registreert verkopersfacturen bij het openen van de mailbox en synchroniseert de transacties. Geen commando of invoer per item. Niet volledig vast te stellen facturen/aankopen blijven afzonderlijk als onzeker bewijs zichtbaar.
-- **AH-verificatie:** `/ft auto on` zoekt de VPS-kandidaten; `/ft auto status` toont exacte game-zoekactiviteit. Aankopen en verkopen zelf uitvoeren.
+- **Volledig automatische AH-verificatie:** zodra je het Auction House opent, zoekt de addon de VPS-kandidaten en vergelijkt de echte gameprijs met de instaplimiet. Geen slash-commands nodig. Na logout of /reload uploadt de Windows-bridge die geverifieerde prijzen naar de VPS. Alleen aankopen/verkopen zelf blijven handmatig.
 
 **Beperking:** TK publiceert doorgaans een marktsnapshot per uur. SavedVariables worden pas bij logout of /reload naar Windows geschreven, zodat tijdens het spelen geen live bank- of portfolio-synchronisatie mogelijk is. Vraagprijs en scenario zijn niet hetzelfde als gegarandeerde verkoopwinst. De beta is automatisch getest met Python-/Lua-regressies; een echte WoW Forever-clientsessie blijft noodzakelijk voor definitieve validatie.
 
@@ -36,7 +36,7 @@ Het script compileert de Python-code, draait de regressietests en **stopt bij fo
 
 De v4-server verzamelt onafhankelijk van WoW elk uur de openbare marktprijzen en bouwt historie op. Hij bewaart de laatst gesynchroniseerde gold, tassen, bekende veilingen en afgesloten sessies **per character**, en berekent telkens nieuwe onderzoeks- en handelsadviezen op basis van historische prijsdata en beschikbare gold. De Windows-bridge verstuurt sessiegegevens na uitloggen en zet een korte `FT3`-controleplanning en adviezen per character klaar voordat WoW opnieuw start.
 
-**V4 starten:** na de eenmalige VPS-/Windows-koppeling installeert `INSTALL-V4-BRIDGE.bat` de automatische Windows-bridge. Sluit WoW na de eerste koppeling volledig af zodat de bridge de serverzoeklijst kan klaarzetten. Daarna volstaat in-game: AH openen en `/ft auto on` (alleen zoeken); `/ft auto status` vertelt waarom zoeken eventueel pauzeert. Geen handmatige FT3-planning meer plakken. De read-only zoeklijst blijft maximaal 24 uur bruikbaar, ook tijdens lange WoW-sessies. Voor een **live desktopoverzicht** start je `DASHBOARD-V4.bat`: dit haalt elke 30 seconden rechtstreeks de nieuwste strategieën op van de VPS, zonder WoW te wijzigen.
+**V4 starten:** na de eenmalige VPS-/Windows-koppeling installeert `INSTALL-V4-BRIDGE.bat` de automatische Windows-bridge. Sluit WoW na de eerste koppeling volledig af zodat de bridge de serverzoeklijst kan klaarzetten. Daarna volstaat in-game: het AH openen. De addon begint vanzelf met zoeken en toont wat er wordt gecontroleerd. `/ft auto status` is hooguit een optionele diagnose. Geen handmatige FT3-planning meer plakken. De read-only zoeklijst blijft maximaal 24 uur bruikbaar, ook tijdens lange WoW-sessies. Voor een **live desktopoverzicht** start je `DASHBOARD-V4.bat`: dit haalt elke 30 seconden rechtstreeks de nieuwste strategieën op van de VPS, zonder WoW te wijzigen.
 
 **Belangrijk:** draai op de VPS `v4_server.py` en NIET daarnaast `START.bat` voor dezelfde database. De addon kan geen internetverbinding openen; de bridge kan een serverplan pas veilig in SavedVariables zetten **nadat WoW volledig is afgesloten**. In één al lopende gamesessie komt geen nieuwe serverplanning binnen. Geen automatische koop- of verkoopacties. Geen geverifieerde GPH zolang we geen echte transactiekosten en verkoopresultaten hebben.
 
@@ -46,9 +46,9 @@ Start op je Windows-pc **`DASHBOARD-V4.bat`**. Dit start lokaal een browserdashb
 
 Je ziet er de echte TK-vraagprijzen, 14-daagse vraagprijshistorie indien geïmporteerd, **als verkoop gemelde** bedragen en geschatte/waar beschikbaar bevestigde volumes. Het dashboard toont een conservatieve **referentie-uitstapprijs, maximale theoretische koopprijs en potentieel verschil vóór deposit** uitsluitend waar daarvoor gegevens zijn. Zo'n marge is nooit gegarandeerde winst; een externe vraagprijs is geen verkoop. Vendor flips worden **niet** berekend: de Forever-vendorprijs is nog niet in de game gevalideerd.
 
-Verder bevat het de **exacte 20 (of minder) zoekitems per character**, op volgorde, plus de echte zoekopdrachten en laagste in-game AH-prijzen uit de opgeslagen addon-export. De nieuwe addon zegt bij elke zoekopdracht en ieder volledig ontvangen resultaat ook in WoW wat hij doet. Typ `/ft auto status` voor de huidige sessie.
+Verder bevat het de **exacte 20 (of minder) zoekitems per character**, op volgorde, plus de echte zoekopdrachten en laagste in-game AH-prijzen uit de opgeslagen addon-export. De nieuwe addon zegt bij elke zoekopdracht en ieder volledig ontvangen resultaat ook in WoW wat hij doet. De actuele controles verschijnen automatisch in WoW; `/ft auto status` is alleen optioneel voor foutdiagnose.
 
-**Beperking:** WoW schrijft SavedVariables alleen bij uitloggen of `/reload`. Het dashboard kan die in-game prijzen dus pas daarna uitlezen en toont nadrukkelijk hoe oud ze zijn. Het leest geen geheugen en koopt of verkoopt niets automatisch.
+**Beperking:** WoW schrijft SavedVariables alleen bij uitloggen of `/reload`. De Windows-bridge verstuurt dan gecontroleerde gameprijzen automatisch naar de VPS; het dashboard toont de meting en ouderdom. Geen live in-game feed. Het leest geen geheugen en koopt of verkoopt niets automatisch.
 
 [Volledige V4-handleiding, serverinstallatie, Windows-configuratie en beperkingen](docs/FOREVERTRADER-V4.md).
 
@@ -91,7 +91,7 @@ Sluit eerst WoW en `START.bat`. De updater bewaart `config.json` en `data/` en v
 
 ## Nieuw in 3.3.1: automatisch AH zoeken + AHK-audiocues
 
-- Met `/ft auto on` zoekt de addon zelfstandig de items uit je ingeladen FT3-planning zolang je bij het AH staat. Bij een geschikte koop- of verkoopsituatie pauzeert hij zodat de actuele prijs zichtbaar blijft. `/ft auto off` schakelt dit uit.
+- Historisch 3.3.1-gedrag: `/ft auto on` was toen nodig. **In ForeverTrader 1.0 Beta begint dit vanzelf bij het openen van het AH.** `/ft auto off` blijft alleen een optionele pauzeknop.
 - Windows **AutoHotkey v2** spreekt **"Loop naar het Auction House"** of **"Loop naar de mailbox"** wanneer de coach daarom vraagt. Installeer AHK v2, start `.\\START-AUDIO.bat` en druk **F6** terwijl WoW actief is. **F7/F8** testen de twee meldingen, **F9** stopt AHK.
 - De koppeling leest uitsluitend twee kleine statuskleurvlakken uit het spelvenster. Er wordt niet gescreend op itemprijzen en geen gamegeheugen gelezen.
 - **Niet verwarren met een automatische handelaar:** aankopen, verkopen en posten zijn in deze versie nog niet automatisch; daarvoor is eerst een geteste client-specifieke transactie-uitvoerder nodig. De bestaande 5g live-testlimieten gelden nog.
