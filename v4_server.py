@@ -190,14 +190,19 @@ class Handler(BaseHTTPRequestHandler):
             if type(sessions) is not list or len(sessions)>60:
                 raise ValueError('Bad sessions')
             trades=data.get('trades',[])
-            if type(trades) is not list or len(trades)>250:
-                raise ValueError('Bad manual trade batch')
+            if type(trades) is not list or len(trades)>500:
+                raise ValueError('Bad AH trade batch')
+            issues=data.get('trade_issues')
+            if issues is not None and (type(issues) is not list or len(issues)>100):
+                raise ValueError('Bad AH issue batch')
             # Validate all before committing anything. Client retries are
             # idempotent by character timestamps + session IDs.
             for ses in sessions:
                 v4.normalize_session(ses,now)
             for trade in trades:
                 v4_trades.validate(trade,now)
+            if issues is not None:
+                for issue in issues:v4_trades.validate_issue(issue,now)
             allowed={x['character_key'] for x in chars}
             # A session may refer to a previously recorded offline character;
             # matching a session to this private account is checked below.
@@ -210,10 +215,13 @@ class Handler(BaseHTTPRequestHandler):
                     count=characters.store(db,chars)
                     added=v4.store_sessions(db,sessions,now)
                     trades_added=v4_trades.store(db,trades,now,allowed|old)
+                    issue_count=(v4_trades.sync_issues(db,issues,allowed)
+                                 if issues is not None else None)
                     v4.strategy_list(db,now,self.server.cfg)
             finally:db.close()
             return self.respond(200,{'ok':True,'characters_updated':count,
-                                     'sessions_added':added,'trades_added':trades_added})
+                                     'sessions_added':added,'trades_added':trades_added,
+                                     'unresolved_trades':issue_count})
         except (ValueError,TypeError,OverflowError,sqlite3.Error):
             return self.respond(400,{'error':'Invalid sync data'})
 
