@@ -14,6 +14,7 @@ import v4_engine
 import v4_investing
 import v4_portfolio
 import v4_daily_radar
+import v4_game_prices
 
 MARKET = 'eu-2-110'
 RESEARCH_LIMIT = 120
@@ -41,12 +42,15 @@ def build(db, clock, cfg):
         'opportunities':[], 'lookup':{},'budget_copper':None,'budget_character':None,
         'investments':[],'shortlist_count':0,'rising_count':0,'falling_count':0,
         'basket_change_7d_pct':None,'basket_item_count':0,
-        'portfolio':None,'intraday':None,
+        'portfolio':None,'intraday':None,'game_checks':[],
         'last_attempt':trader.getmeta(db,'market_attempt',0) or None,
         'last_error':trader.getmeta(db,'market_last_error','') or None,
     }
+    recent_game=v4_game_prices.recent(db,clock,60)
+    result['game_checks']=recent_game
     if not row:
         result['portfolio']=v4_portfolio.build(db,{},0,clock,cfg,[])
+        result['portfolio']['game_checks']=recent_game
         result['intraday']=v4_daily_radar.build(db,{},0,clock,cfg,[])
         return result
     age=clock-int(row['t'])
@@ -60,6 +64,11 @@ def build(db, clock, cfg):
     result.update(v4_investing.analyze(db,market,int(row['t']),cfg,clock))
     result['portfolio']=v4_portfolio.build(db,market,int(row['t']),clock,cfg,
                                            result.get('investments') or [])
+    for q in recent_game:
+        info=market.get(q['id']) or {}
+        q['name']=info.get('name') or f"Item {q['id']}"
+    result['portfolio']['game_checks']=recent_game
+    v4_game_prices.annotate(result['portfolio']['buy_review'],recent_game,clock)
     result['intraday']=v4_daily_radar.build(
         db,market,int(row['t']),clock,cfg,
         result.get('investments') or [],
