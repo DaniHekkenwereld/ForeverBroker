@@ -116,7 +116,7 @@ assert(self.bank[12363]==5,'unavailable bank slots must NOT wipe last bank snaps
 fire('BANKFRAME_CLOSED')
 -- No per-item trade commands; actual game evidence triggers accounting.
 SlashCmdList.FOREVERTRADER('market')
-SlashCmdList.FOREVERTRADER('start')
+-- Coach and AH scanner must start without /ft start or /ft auto on.
 fire('MAIL_SHOW');fire('MAIL_INBOX_UPDATE')
 assert(ForeverTraderDB.mail3==clock..'|97000|40000|1|0|0',ForeverTraderDB.mail3)
 assert(ForeverTraderDB.coach:match('|COLLECT|'))
@@ -127,6 +127,12 @@ assert(math.abs(textures[1].color[2]-.85)<.01,'AH voice marker should turn green
 fire('MAIL_CLOSED')
 fire('AUCTION_HOUSE_SHOW')
 assert(ForeverTraderDB.coach:match('|PLAN|'))
+assert(C_AuctionHouse.searchCount==nil,'no VPS plan: never issue ungrounded scans')
+local noPlanNotice=false
+for _,line in ipairs(prints)do
+    if line:find('Nog geen geldige VPS-zoeklijst',1,true) then noPlanNotice=true end
+end
+assert(noPlanNotice,'missing imported plan explained automatically, not via slash command')
 fire('REPLICATE_ITEM_LIST_UPDATE')
 assert(ForeverTraderDB.scan:match('2589:5:500'))
 assert(Auctionator.EventBus.event=='incremental_scan_complete')
@@ -140,20 +146,17 @@ assert(ForeverTraderDB.browseSummary==clock..';2589:125:90;2592:200:50',ForeverT
 -- Explicit search is always read-only, even without an imported plan.
 SlashCmdList.FOREVERTRADER('search 2589')
 assert(C_AuctionHouse.lastSearched==2589)
--- Missing server plan must explain why auto remains idle; no false success.
-SlashCmdList.FOREVERTRADER('auto on')
-assert(prints[#prints]:find('Geen geldige V4%-zoeklijst geladen'), 'auto must explain missing plan')
-SlashCmdList.FOREVERTRADER('auto off')
+-- After an AH close, it must not continue scanning in the background.
+fire('AUCTION_HOUSE_CLOSED')
 -- Reconnect after the old search timeout with a valid desktop trading plan.
 clock=clock+40
 ForeverTraderDB.v4PlanBlob='FT4!eu-2-110#Mage Pump?FT3|eu-2-110|'..clock..'|'..(clock+900)..';2589:140:10:200:0'
 ForeverTraderDB.v4ActionsBlob='FT4!eu-2-110#Mage Pump?INVEST_SHORT:2589:1:110:190'
 fire('PLAYER_LOGIN')
-SlashCmdList.FOREVERTRADER('start')
-fire('AUCTION_HOUSE_SHOW')
 local before=C_AuctionHouse.searchCount or 0
-SlashCmdList.FOREVERTRADER('auto on')
-assert(C_AuctionHouse.searchCount==before+1,'auto on should immediately start a search at open AH')
+fire('AUCTION_HOUSE_SHOW')
+assert(C_AuctionHouse.searchCount==before+1,
+       'opening AH alone must start VPS price verification without commands')
 assert(ForeverTraderDB.v4SearchLog and ForeverTraderDB.v4SearchLog:find(':Q:2589:',1,true),
        'auto queries must be persisted with item ID for the dashboard')
 SlashCmdList.FOREVERTRADER('auto status')
