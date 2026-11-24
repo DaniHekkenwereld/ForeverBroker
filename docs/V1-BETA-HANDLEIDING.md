@@ -37,17 +37,17 @@ Bankgegevens worden niet gewist omdat de bank bij een latere login gesloten is. 
 
 Open het AH en typ /ft auto on. Typ /ft auto status voor het aantal zoekopdrachten en resultaten. Typ /ft v4 voor de laatste per-character investeringsonderzoeken met instap- en scenarioverkoopprijs. Gameprijzen komen op het dashboard pas beschikbaar na een nieuw SavedVariables-save-event; de webpagina leest geen live WoW-geheugen.
 
-## Echte kostprijs optioneel vastleggen
+## Aankopen, verkopen en winst: automatisch
 
-Na daadwerkelijke inkoop van twee Arcane Crystals voor totaal 15g25s:
+Geen per-item commando's en geen invoerschermen. De WoW-addon kijkt passief naar de Auction House-API, bevestigde aankopen en werkelijk afgeschreven gold. Bij commodity-aankopen gebruikt hij het item en aantal uit de aankoop-events of de bevestigde aankoopintentie. Bij gewone veilingen koppelt hij de veiling-ID aan de exact waargenomen stack.
 
-    /ft trade buy 12363 2 15.25g
+Een verkoop telt **pas** wanneer de mailbox een afgeronde seller-factuur teruggeeft. Alleen een geplaatste of verdwenen veiling is geen gerealiseerde verkoop. De addon gebruikt de daadwerkelijke uitbetaling min teruggestorte deposit, niet een verwachte vraagprijs. De normale mailbox moet eenmaal worden geopend om zulke facturen in de client te laden. Dat is geen handmatige administratie.
 
-Na daadwerkelijke verkoop van twee stuks en NET ontvangen 18g:
+Na een WoW-save (/reload of uitloggen) verstuurt de bestaande Windows-bridge de automatisch geregistreerde transacties naar de VPS. Elke transactie krijgt een unieke sleutel en kan niet opnieuw worden meegeteld bij een volgende sync. Het dashboard toont transacties, FIFO-kostprijzen en gerealiseerd resultaat wanneer zowel inkoop- als verkoopbedrag vaststaan.
 
-    /ft trade sell 12363 2 18g
+Bij een ontbrekende hoeveelheid, een niet gemeten gold-uitgave, een onherkenbare mail of een onbekende itemvariant blijft de gebeurtenis zichtbaar als **onvolledige AH-waarneming**. Die telt niet mee als winst. Daarmee ontstaat geen verzonnen P&L. Oudere handmatige registraties blijven uitsluitend voor historische compatibiliteit bestaan, maar zijn niet meer nodig en de nieuwe addon heeft geen transactiecommando.
 
-Log uit om ze te synchroniseren. FIFO koppelt alleen uitdrukkelijk ingevoerde aankopen en verkopen. Ontbrekende inkoopbasis wordt niet ingevuld met fictieve winst. Dit zijn handmatige verklaringen, geen automatisch uit AH-aankopen afgeleide transacties.
+Technische grens: de gewone WoW-addon heeft geen directe HTTPS-toegang, en gegevens uit verkochte veilingen op een uitgelogd character zijn pas zichtbaar als WoW die via mailbox/API beschikbaar stelt. Daarom is exacte reconstructie van *ieder* verleden of offline item zonder voldoende gamegegevens niet te garanderen.
 
 ## Wat deze beta NIET belooft
 
