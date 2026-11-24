@@ -100,7 +100,6 @@ class QuickViewTests(unittest.TestCase):
         self.assertIn('Nog geen echte AH-prijs',html)
         self.assertIn('Bevestigde winst',html)
         self.assertIn('— betekent: onvoldoende kostprijsbewijs',html)
-        self.assertNotIn('Na WoW-save naar VPS verstuurd</small>',html) if False else None
 
     def test_untrusted_item_names_escaped_and_number_only_links(self):
         report=test_report()
@@ -113,7 +112,12 @@ class QuickViewTests(unittest.TestCase):
         self.assertIn('auctionhouse.tk.gg/m/eu-2-110/1111',html)
 
     def test_dashboard_hides_long_tables_until_expanded(self):
-        html=v4_dashboard.render([],NOW,test_report(),{})
+        report=test_report()
+        # Detail tables require the full portfolio schema. This test focuses
+        # on the overview and collapsed reference sections, not mock data.
+        report['portfolio']['buy_review']=[]
+        report['portfolio']['holdings']=[]
+        html=v4_dashboard.render([],NOW,report,{})
         self.assertIn('class="action-center"',html)
         self.assertIn('class="action-grid"',html)
         self.assertGreaterEqual(html.count('<details class="detail-group"'),7)
