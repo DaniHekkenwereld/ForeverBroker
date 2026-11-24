@@ -699,9 +699,9 @@ frame:SetScript('OnEvent',function(_,e,...)
         elseif e=='PLAYERBANKSLOTS_CHANGED' or e=='PLAYERBANKBAGSLOTS_CHANGED' then
             if bankOpen then getBank() end
         elseif e=='PLAYER_EQUIPMENT_CHANGED' then getEquipment()
-        elseif e=='MAIL_SHOW' then s.mailOpen=true;s.mailKnown=false;s.ahOpen=false;if C_Timer and C_Timer.After then C_Timer.After(1,function() if s.mailOpen then check(function() mailbox();update() end) end end) end
+        elseif e=='MAIL_SHOW' then s.active=true;s.mailOpen=true;s.mailKnown=false;s.ahOpen=false;if C_Timer and C_Timer.After then C_Timer.After(1,function() if s.mailOpen then check(function() mailbox();update() end) end end) end
         elseif e=='MAIL_INBOX_UPDATE' then mailbox()
-        elseif e=='MAIL_CLOSED' then s.mailOpen=false
+        elseif e=='MAIL_CLOSED' then s.mailOpen=false;if not s.ahOpen then s.active=false end
         elseif e=='UPDATE_PENDING_MAIL' then mailSignal();if not s.mailOpen and HasNewMail and HasNewMail() and now()-(s.lastMail or 0)>60 then s.mailAlert=true end
         elseif e=='AUCTION_HOUSE_SHOW' then startAHVerification()
         elseif e=='PLAYER_INTERACTION_MANAGER_FRAME_SHOW' and Enum and Enum.PlayerInteractionType and key==Enum.PlayerInteractionType.Auctioneer then startAHVerification()
