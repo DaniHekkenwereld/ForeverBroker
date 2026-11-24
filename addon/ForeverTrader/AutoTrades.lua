@@ -12,12 +12,14 @@ local function recordError(kind,item,qty,amount,reason,at)
     if not state then return end
     local d=state.d
     d.autoTradeIssues=type(d.autoTradeIssues)=='table' and d.autoTradeIssues or {}
-    d.autoTradeIssues[#d.autoTradeIssues+1]={
+    local issue={
         at=at or state.clock(),realm=state.realm,character=state.character,
         kind=kind,item=item or 0,qty=qty or 0,amount=amount or 0,
         reason=reason or 'UNKNOWN'}
+    d.autoTradeIssues[#d.autoTradeIssues+1]=issue
     while #d.autoTradeIssues>100 do table.remove(d.autoTradeIssues,1) end
     A.export()
+    return issue
 end
 function A.export()
     if not state then return end
@@ -38,7 +40,7 @@ function A.export()
     local issues={'FTISSUE1'}
     bytes=8
     for _,r in ipairs(d.autoTradeIssues or {}) do
-        if type(r)=='table' then
+        if type(r)=='table' and not r.resolved then
             local line=table.concat({
                 safe(r.at),safe(r.realm),safe(r.character),safe(r.kind),
                 safe(r.item),safe(r.qty),safe(r.amount),safe(r.reason)},'|')
@@ -77,7 +79,7 @@ function A.login(d,realm,character,clock,money)
     A.export()
 end
 function A.intent(item,qty,auctionID,kind)
-    if not state or not pos(item) then return end
+    if not state or (item~=nil and not pos(item)) then return end
     local at=state.clock()
     -- A new purchase intent never authorizes a ledger record by itself.
     local entry={at=at,item=item,qty=pos(qty) and qty or nil,
@@ -116,7 +118,7 @@ function A.purchased(item,qty,kind)
             and (not kind or not entry.kind or kind==entry.kind)
             and (not entry.confirmed or (entry.confirmedAt and
                 at-entry.confirmedAt<=2))
-            and (not pos(item) or entry.item==item) then
+            and (not pos(item) or not pos(entry.item) or entry.item==item) then
             found=entry;break
         end
     end
@@ -144,12 +146,12 @@ function A.failed()
         end
     end
 end
-function A.update()
+function A.update(force)
     if not state then return end
     local at=state.clock()
     for i=#state.intents,1,-1 do
         local r=state.intents[i]
-        if (r.confirmed and at-r.confirmedAt>=2) or at-r.at>=18 then
+        if (r.confirmed and (force or at-r.confirmedAt>=2)) or at-r.at>=18 then
             if r.confirmed and pos(r.item) and pos(r.qty) and pos(r.spent) then
                 commit('BUY',r.item,r.qty,r.spent,'AH_BUY',r.confirmedAt)
             elseif r.confirmed then
@@ -208,25 +210,31 @@ function A.mailScan(getHeader,getInvoice,getCount)
                 local matches=d.autoMailSeen[signature]
                 if type(matches)~='table' then matches={};d.autoMailSeen[signature]=matches end
                 local matched=false
+                local existing=nil
                 for _,prev in ipairs(matches) do
                     if not visited[prev] and
                       ((not expiry and not prev.expiry) or
                         (expiry and prev.expiry and math.abs(expiry-prev.expiry)<=5)) then
-                        visited[prev]=true;matched=true;break
+                        visited[prev]=true;matched=true;existing=prev;break
                     end
                 end
                 if not matched then
-                    local observation={expiry=expiry,at=now}
-                    matches[#matches+1]=observation
-                    visited[observation]=true
+                    existing={expiry=expiry,at=now,status='new'}
+                    matches[#matches+1]=existing
+                    visited[existing]=true
+                end
+                if existing and existing.status~='resolved' then
                     local item=resolve(name)
                     if pos(item) and pos(qty) and pos(net) then
                         commit('SELL',item,qty,net,'AH_MAIL',now)
-                    else
-                        recordError('SELL',item,qty,net,
+                        existing.status='resolved'
+                        if existing.issue then existing.issue.resolved=true end
+                    elseif existing.status=='new' then
+                        existing.issue=recordError('SELL',item,qty,net,
                             not pos(item) and 'MAIL_ITEM_UNRESOLVED' or
                             not pos(qty) and 'MAIL_QUANTITY_UNRESOLVED' or
                             'MAIL_NET_UNCONFIRMED',now)
+                        existing.status='unresolved'
                     end
                 end
             end
