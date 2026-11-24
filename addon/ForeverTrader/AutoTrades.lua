@@ -8,14 +8,14 @@ local A=ForeverTraderAutoTrades
 local state=nil
 local function pos(n) return type(n)=='number' and n==math.floor(n) and n>0 and n<=9007199254740991 end
 local function safe(x) return tostring(x or ''):gsub('[|;]','_'):gsub('[%c\\"]','_') end
-local function recordError(kind,item,qty,amount,reason,at)
+local function recordError(kind,item,qty,amount,reason,at,itemName)
     if not state then return end
     local d=state.d
     d.autoTradeIssues=type(d.autoTradeIssues)=='table' and d.autoTradeIssues or {}
     local issue={
         at=at or state.clock(),realm=state.realm,character=state.character,
         kind=kind,item=item or 0,qty=qty or 0,amount=amount or 0,
-        reason=reason or 'UNKNOWN'}
+        reason=reason or 'UNKNOWN',name=itemName or ''}
     d.autoTradeIssues[#d.autoTradeIssues+1]=issue
     while #d.autoTradeIssues>100 do table.remove(d.autoTradeIssues,1) end
     A.export()
@@ -37,13 +37,14 @@ function A.export()
         end
     end
     d.autoTradesWire=table.concat(lines,';')
-    local issues={'FTISSUE1'}
+    local issues={'FTISSUE2'}
     bytes=8
     for _,r in ipairs(d.autoTradeIssues or {}) do
         if type(r)=='table' and not r.resolved then
             local line=table.concat({
                 safe(r.at),safe(r.realm),safe(r.character),safe(r.kind),
-                safe(r.item),safe(r.qty),safe(r.amount),safe(r.reason)},'|')
+                safe(r.item),safe(r.qty),safe(r.amount),safe(r.reason),
+                safe(r.name)},'|')
             if bytes+#line+1<=19000 then
                 issues[#issues+1]=line;bytes=bytes+#line+1
             end
@@ -233,7 +234,7 @@ function A.mailScan(getHeader,getInvoice,getCount)
                         existing.issue=recordError('SELL',item,qty,net,
                             not pos(item) and 'MAIL_ITEM_UNRESOLVED' or
                             not pos(qty) and 'MAIL_QUANTITY_UNRESOLVED' or
-                            'MAIL_NET_UNCONFIRMED',now)
+                            'MAIL_NET_UNCONFIRMED',now,name)
                         existing.status='unresolved'
                     end
                 end
