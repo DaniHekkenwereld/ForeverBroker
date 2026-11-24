@@ -7,7 +7,10 @@ ForeverTraderAutoTrades={}
 local A=ForeverTraderAutoTrades
 local state=nil
 local function pos(n) return type(n)=='number' and n==math.floor(n) and n>0 and n<=9007199254740991 end
-local function safe(x) return tostring(x or ''):gsub('[|;]','_'):gsub('[%c\\"]','_') end
+local function safe(x)
+    local cleaned=tostring(x or ''):gsub('[|;]','_'):gsub('[%c\\"]','_')
+    return cleaned -- gsub returns (string,count); never export the second value.
+end
 local function recordError(kind,item,qty,amount,reason,at,itemName)
     if not state then return end
     local d=state.d
