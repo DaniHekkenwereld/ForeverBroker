@@ -73,6 +73,7 @@ end
 dofile('addon/ForeverTrader/Logic.lua')
 dofile('addon/ForeverTrader/Target.lua')
 dofile('addon/ForeverTrader/V4.lua')
+dofile('addon/ForeverTrader/AutoTrades.lua')
 dofile('addon/ForeverTrader/ForeverTrader.lua')
 fire('PLAYER_LOGIN')
 assert(type(ForeverTraderDB.characters)=='table','account-wide snapshot must exist')
@@ -102,13 +103,7 @@ fire('BANKFRAME_OPENED')
 self=ForeverTraderDB.characters['eu-2-110#Mage Pump']
 assert(self.bank[12363]==5,'unavailable bank slots must NOT wipe last bank snapshot')
 fire('BANKFRAME_CLOSED')
-SlashCmdList.FOREVERTRADER('trade buy 12363 2 15.25g')
-assert(ForeverTraderDB.tradesWire and ForeverTraderDB.tradesWire:find('|BUY|12363|2|152500',1,true),
-       'manually confirmed purchase should export exact copper and quantity')
-SlashCmdList.FOREVERTRADER('trade sell 12363 2 18g')
-assert(ForeverTraderDB.tradesWire:find('|SELL|12363|2|180000',1,true),
-       'manual net sale must be recorded as such, not inferred from wallet')
-assert(#ForeverTraderDB.v4Trades==2,'exactly two explicitly confirmed trades recorded')
+-- No per-item trade commands; actual game evidence triggers accounting.
 SlashCmdList.FOREVERTRADER('market')
 SlashCmdList.FOREVERTRADER('start')
 fire('MAIL_SHOW');fire('MAIL_INBOX_UPDATE')
