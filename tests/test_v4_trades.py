@@ -47,6 +47,29 @@ class TradeLedgerTests(unittest.TestCase):
             v4_trades.store(self.db,[changed],self.now,{self.key})
         self.assertEqual(v4_trades.summarize(self.db)['positions'][12363]['known_cost'],10000)
 
+    def test_fifo_basis_follows_same_account_character_transfer(self):
+        buyer='account:eu-2-110:Mage Pump'
+        seller='account:eu-2-110:Warrior Tank'
+        other='other:eu-2-110:Bank Alt'
+        rows=[
+            {**self.row('x1','BUY',2,200000,self.now-90),
+             'character_key':buyer},
+            {**self.row('x2','SELL',1,140000,self.now-70),
+             'character_key':seller},
+            {**self.row('x3','SELL',1,190000,self.now-60),
+             'character_key':other},
+        ]
+        self.assertEqual(v4_trades.store(self.db,rows,self.now,
+                                         {buyer,seller,other}),3)
+        summary=v4_trades.summarize(self.db)
+        matched=next(r for r in summary['recent_trades'] if
+                     r['character_key']==seller)
+        unknown=next(r for r in summary['recent_trades'] if
+                     r['character_key']==other)
+        self.assertEqual(matched['realized_net_after_reported_cost'],40000)
+        self.assertIsNone(unknown['realized_net_after_reported_cost'])
+        self.assertEqual(summary['unmatched_sales'],1)
+
     def test_unrecorded_initial_inventory_cannot_invent_profit(self):
         sale=self.row('4','SELL',4,800000)
         self.assertEqual(v4_trades.store(self.db,[sale],self.now,{self.key}),1)
