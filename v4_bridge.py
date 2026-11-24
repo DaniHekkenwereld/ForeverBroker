@@ -301,7 +301,24 @@ def api_request(base,token,endpoint,payload=None):
                          (': '+detail if detail else '')) from None
 
 
-def send_sync(base,token,chars,sessions,trades=None,issues=None):
+def game_quotes_from_saved(text,clock):
+    """Read verified exact-item books, not raw arbitrary Q/R search events.
+
+    Parses the addon's saved targetLog after WoW wrote SavedVariables.
+    A game quote is never a sale and never a live price feed.
+    """
+    import v4_local_activity  # local import avoids circular module reference
+    parsed=v4_local_activity.from_text(text,clock,limit=120)
+    result=[]
+    for row in parsed.get('observations',[]):
+        if row.get('ask') is None:continue
+        result.append({'id':row['id'],'at':row['at'],'kind':row['kind'],
+                       'ask':row['ask'],'units':row['units'],
+                       'price_rows':row['price_rows']})
+    return result[:120]
+
+
+def send_sync(base,token,chars,sessions,trades=None,issues=None,game_quotes=None):
     """Upload character observations even if a legacy session batch is rejected.
 
     Return the number of sessions actually accepted for the summary. The
@@ -312,6 +329,7 @@ def send_sync(base,token,chars,sessions,trades=None,issues=None):
     payload={'schema':'FT4SYNC1','characters':chars,'sessions':sessions,
              'trades':trades}
     if issues is not None:payload['trade_issues']=issues
+    if game_quotes is not None:payload['game_quotes']=game_quotes
     try:
         response=api_request(base,token,'/api/v4/sync',payload)
     except ValueError as exc:
@@ -319,6 +337,7 @@ def send_sync(base,token,chars,sessions,trades=None,issues=None):
             safe={'schema':'FT4SYNC1','characters':chars,'sessions':[],
                   'trades':trades}
             if issues is not None:safe['trade_issues']=issues
+            if game_quotes is not None:safe['game_quotes']=game_quotes
             response=api_request(base,token,'/api/v4/sync',safe)
             print('V4: sessiebatch geweigerd; charactergegevens apart gesynchroniseerd. '
                   'Originele sessies blijven bewaard.',flush=True)
@@ -362,6 +381,7 @@ def sync_once(prepared_only=False):
     sessions=parse_sessions(text,now,account)
     trades=parse_trades(text,now,account)
     issues=parse_trade_issues(text,now,account)
+    game_quotes=game_quotes_from_saved(text,now)
     sessions,skipped=compatible_sessions(chars,sessions,now)
     keys={c['character_key'] for c in chars}
     trades=[trade for trade in trades if trade['character_key'] in keys]
@@ -369,7 +389,7 @@ def sync_once(prepared_only=False):
         issues=[issue for issue in issues if issue['character_key'] in keys]
     if skipped:
         print('V4: '+str(skipped)+' oude sessie(s) met afwijkende naam/markt overgeslagen; origineel bewaard.',flush=True)
-    uploaded_sessions=send_sync(base,token,chars,sessions,trades,issues)
+    uploaded_sessions=send_sync(base,token,chars,sessions,trades,issues,game_quotes)
     strategy=api_request(base,token,'/api/v4/strategies')
     if strategy.get('version')!='4.0.0' or strategy.get('market')!='eu-2-110':
         raise ValueError('Verkeerde V4 server/markt')
@@ -377,7 +397,7 @@ def sync_once(prepared_only=False):
     if not isinstance(plans,list):raise ValueError('Ongeldig serverantwoord')
     dashboard=v4_dashboard.write(trader.ROOT/'data'/'v4'/'dashboard.html',plans,now)
     result=write_plans(path,text,plans) if not prepared_only else 'Sessies naar VPS gestuurd'
-    return f'Verstuurd: {len(chars)} characters, {uploaded_sessions} sessies, {len(trades)} transacties, {len(issues or [])} onvolledige AH-waarnemingen. {result} | Dashboard: {dashboard}'
+    return f'Verstuurd: {len(chars)} characters, {uploaded_sessions} sessies, {len(trades)} transacties, {len(issues or [])} onvolledige AH-waarnemingen, {len(game_quotes)} in-game AH-prijzen voor VPS. {result} | Dashboard: {dashboard}'
 
 
 def main():
