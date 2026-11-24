@@ -79,6 +79,16 @@ A.mailScan(header,invoice,getCount)
 assert(#d.autoTrades==5,'late item cache resolves sale automatically')
 local _,after=A.count()
 assert(after==unresolved-1,'previously unresolved invoice warning should clear')
+-- Identical inbox invoices on different alts are separate actual sales.
+local beforeAlt=#d.autoTrades
+A.login(d,'eu-2-110','Warrior Tank',clock,money)
+A.mailScan(header,invoice,getCount)
+assert(#d.autoTrades==beforeAlt+3,
+       'same invoice data on another character must not be deduplicated away')
+A.login(d,'eu-2-110','Mage Pump',clock,money)
+A.mailScan(header,invoice,getCount)
+assert(#d.autoTrades==beforeAlt+3,
+       'returning to first character must not re-import old seller mail')
 assert(d.autoTradesWire:find('FTTRADE2;',1,true),'persist automatic ledger for bridge')
 assert(d.autoTradeIssuesWire:find('FTISSUE2;',1,true),'persist unresolved observations')
 local issueRow=d.autoTradeIssuesWire:match('^FTISSUE2;([^;]+)')
