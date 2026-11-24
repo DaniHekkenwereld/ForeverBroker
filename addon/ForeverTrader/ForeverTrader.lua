@@ -597,16 +597,16 @@ local function searchNext(id,quiet)
 end
 -- Diagnose every silent auto-search gate. The search list is read-only.
 local function autoBlockReason()
-    if not s.autoSearch then return 'Automatisch zoeken staat uit.' end
-    if not s.active then return 'Start eerst de coach met /ft start.' end
+    if not s.autoSearch then return 'AH-controle uitgeschakeld voor deze sessie.' end
+    if not s.active then return 'AH-controle wordt bij het openen van het Auction House gestart.' end
     -- If the client missed AUCTION_HOUSE_SHOW, recover from the visible AH.
     if not s.ahOpen and AuctionHouseFrame and AuctionHouseFrame.IsShown and AuctionHouseFrame:IsShown() then
         s.ahOpen=true
     end
-    if not s.ahOpen then return 'Auction House niet herkend. Open het AH-venster en probeer /ft auto status.' end
+    if not s.ahOpen then return 'Auction House niet geopend.' end
     if not realmOK() then return 'Alleen EU Alliance wordt ondersteund.' end
-    if not plan then return 'Geen geldige V4-zoeklijst geladen. /ft v4 kan wel tasadviezen tonen zonder zoeklijst.' end
-    if now()>=plan.expires then return 'V4-zoeklijst verlopen; de Windows-bridge werkt deze bij voor de volgende WoW-start.' end
+    if not plan then return 'Nog geen geldige VPS-zoeklijst voor dit character. Sluit WoW af zodat de Windows-bridge het plan kan laden.' end
+    if now()>=plan.expires then return 'VPS-zoeklijst verlopen. De Windows-bridge vernieuwt dit bij de volgende game-afsluiting.' end
     if not plan.rows or #plan.rows==0 then return 'Server heeft 0 AH-items op de zoeklijst gezet.' end
     if pending then return 'Wachten op AH-resultaten voor item '..pending.id..'.' end
     -- Mail alerts, manual sales and buy-blocks must not stop read-only searches.
@@ -627,6 +627,24 @@ local function maybeAutoSearch()
     if autoBlockReason() then return end
     searchNext(nil,true)
 end
+-- Opening the AH is the only interaction needed to start read-only
+-- verification. Never place a bid or buy automatically.
+local function startAHVerification()
+    s.ahOpen=true;s.mailOpen=false
+    owned()
+    if not realmOK() then return end
+    if V4 and not plan then ensureV4Identity('auction') end
+    s.active=true;s.autoSearch=true
+    update()
+    local reason=autoBlockReason()
+    if reason then
+        say('AH-controle: '..reason)
+    else
+        say('AH-controle gestart; VPS-items worden automatisch gecontroleerd.')
+        maybeAutoSearch()
+    end
+end
+
 local function mailSignal() if HasNewMail then local has=HasNewMail() and true or false;if has and not s.lastMailSignal and not s.mailOpen then s.mailAlert=true end;s.lastMailSignal=has end end
 for _,event in ipairs({'PLAYER_LOGIN','PLAYER_ENTERING_WORLD','PLAYER_LOGOUT','PLAYER_MONEY','MAIL_SHOW','MAIL_CLOSED','MAIL_INBOX_UPDATE','UPDATE_PENDING_MAIL','REPLICATE_ITEM_LIST_UPDATE','AUCTION_HOUSE_SHOW','AUCTION_HOUSE_CLOSED','PLAYER_INTERACTION_MANAGER_FRAME_SHOW','PLAYER_INTERACTION_MANAGER_FRAME_HIDE','BAG_UPDATE_DELAYED','BANKFRAME_OPENED','BANKFRAME_CLOSED','PLAYERBANKSLOTS_CHANGED','PLAYERBANKBAGSLOTS_CHANGED','PLAYER_EQUIPMENT_CHANGED','OWNED_AUCTIONS_UPDATED','ITEM_PURCHASED','COMMODITY_PURCHASE_SUCCEEDED','COMMODITY_PURCHASED','COMMODITY_PURCHASE_FAILED','AUCTION_HOUSE_AUCTIONS_EXPIRED','AUCTION_HOUSE_AUCTION_CREATED','ITEM_SEARCH_RESULTS_UPDATED','ITEM_SEARCH_RESULTS_ADDED','COMMODITY_SEARCH_RESULTS_UPDATED','COMMODITY_SEARCH_RESULTS_ADDED','AUCTION_HOUSE_BROWSE_RESULTS_UPDATED','AUCTION_HOUSE_BROWSE_RESULTS_ADDED'}) do pcall(frame.RegisterEvent,frame,event) end
 frame:SetScript('OnEvent',function(_,e,...)
@@ -639,7 +657,7 @@ frame:SetScript('OnEvent',function(_,e,...)
             s.mailKnown=false;s.active=false;s.cash=0;s.ahOpen=false;s.mailOpen=false
             s.bankKnown=false;s.bagBoundAt=nil;s.equipmentKnown=false
             bankOpen=false;bankStock={};bankBound={};bagBound={};equipped={}
-            bags={};listed={};targetBook={};auctionIndex={}
+            bags={};listed={};targetBook={};auctionIndex={};lastTry={};pending=nil
             if AT then
                 local realm,character=identity()
                 if realm and character then AT.login(db(),realm,character,now,GetMoney()) end
@@ -685,10 +703,10 @@ frame:SetScript('OnEvent',function(_,e,...)
         elseif e=='MAIL_INBOX_UPDATE' then mailbox()
         elseif e=='MAIL_CLOSED' then s.mailOpen=false
         elseif e=='UPDATE_PENDING_MAIL' then mailSignal();if not s.mailOpen and HasNewMail and HasNewMail() and now()-(s.lastMail or 0)>60 then s.mailAlert=true end
-        elseif e=='AUCTION_HOUSE_SHOW' then s.ahOpen=true;s.mailOpen=false;owned()
-        elseif e=='PLAYER_INTERACTION_MANAGER_FRAME_SHOW' and Enum and Enum.PlayerInteractionType and key==Enum.PlayerInteractionType.Auctioneer then s.ahOpen=true;s.mailOpen=false;owned()
-        elseif e=='PLAYER_INTERACTION_MANAGER_FRAME_HIDE' and Enum and Enum.PlayerInteractionType and key==Enum.PlayerInteractionType.Auctioneer then s.ahOpen=false;pending=nil;targetBook={};browseFull=false
-        elseif e=='AUCTION_HOUSE_CLOSED' then s.ahOpen=false;pending=nil;targetBook={};browseFull=false
+        elseif e=='AUCTION_HOUSE_SHOW' then startAHVerification()
+        elseif e=='PLAYER_INTERACTION_MANAGER_FRAME_SHOW' and Enum and Enum.PlayerInteractionType and key==Enum.PlayerInteractionType.Auctioneer then startAHVerification()
+        elseif e=='PLAYER_INTERACTION_MANAGER_FRAME_HIDE' and Enum and Enum.PlayerInteractionType and key==Enum.PlayerInteractionType.Auctioneer then s.ahOpen=false;s.autoSearch=false;s.active=false;pending=nil;targetBook={};browseFull=false;ui:Hide()
+        elseif e=='AUCTION_HOUSE_CLOSED' then s.ahOpen=false;s.autoSearch=false;s.active=false;pending=nil;targetBook={};browseFull=false;ui:Hide()
         elseif e=='REPLICATE_ITEM_LIST_UPDATE' then scan()
         elseif e=='AUCTION_HOUSE_BROWSE_RESULTS_UPDATED' or e=='AUCTION_HOUSE_BROWSE_RESULTS_ADDED' then browseSummary()
         elseif e=='ITEM_SEARCH_RESULTS_UPDATED' or e=='ITEM_SEARCH_RESULTS_ADDED' or e=='COMMODITY_SEARCH_RESULTS_UPDATED' or e=='COMMODITY_SEARCH_RESULTS_ADDED' then
