@@ -141,7 +141,7 @@ def render(research,now):
         headline_kind='neutral'
 
     stats=[
-        ('💰','Gold op 3+ characters' if len(characters)>3 else 'Gold · alle characters',
+        ('💰','Gold · alle characters',
          gold(gold_total),str(len(characters))+' characters · laatst bekend'),
         ('📦','Voorraad',''+str(portfolio.get('holding_types',0))+' itemsoorten',
          str(portfolio.get('unpriced_holding_types',0))+' zonder bruikbare AH-waarde'),
