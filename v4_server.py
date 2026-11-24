@@ -20,6 +20,7 @@ import trader
 import v4_engine as v4
 import v4_research
 import v4_trades
+import v4_game_prices
 
 MAX_BODY=300000
 UTC=dt.timezone.utc
@@ -27,7 +28,7 @@ UTC=dt.timezone.utc
 
 def open_db(path):
     db=trader.connect(pathlib.Path(path))
-    db.executescript(v4.SCHEMA+v4_trades.SCHEMA)
+    db.executescript(v4.SCHEMA+v4_trades.SCHEMA+v4_game_prices.SCHEMA)
     return db
 
 
@@ -195,6 +196,7 @@ class Handler(BaseHTTPRequestHandler):
             issues=data.get('trade_issues')
             if issues is not None and (type(issues) is not list or len(issues)>100):
                 raise ValueError('Bad AH issue batch')
+            game_quotes=v4_game_prices.validate(data.get('game_quotes',[]),now)
             # Validate all before committing anything. Client retries are
             # idempotent by character timestamps + session IDs.
             for ses in sessions:
@@ -204,6 +206,9 @@ class Handler(BaseHTTPRequestHandler):
             if issues is not None:
                 for issue in issues:v4_trades.validate_issue(issue,now)
             allowed={x['character_key'] for x in chars}
+            account_ids={key.split(':',1)[0] for key in allowed}
+            if game_quotes and len(account_ids)!=1:
+                raise ValueError('Account ambiguous for in-game quotes')
             # A session may refer to a previously recorded offline character;
             # matching a session to this private account is checked below.
             db=open_db(self.server.db_path)
@@ -217,11 +222,14 @@ class Handler(BaseHTTPRequestHandler):
                     trades_added=v4_trades.store(db,trades,now,allowed|old)
                     issue_count=(v4_trades.sync_issues(db,issues,allowed)
                                  if issues is not None else None)
+                    game_added=v4_game_prices.store(db,next(iter(account_ids)),
+                                   game_quotes,now) if game_quotes else 0
                     v4.strategy_list(db,now,self.server.cfg)
             finally:db.close()
             return self.respond(200,{'ok':True,'characters_updated':count,
                                      'sessions_added':added,'trades_added':trades_added,
-                                     'unresolved_trades':issue_count})
+                                     'unresolved_trades':issue_count,
+                                     'game_quotes_added':game_added})
         except (ValueError,TypeError,OverflowError,sqlite3.Error):
             return self.respond(400,{'error':'Invalid sync data'})
 
