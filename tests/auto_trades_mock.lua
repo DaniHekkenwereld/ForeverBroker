@@ -81,4 +81,7 @@ local _,after=A.count()
 assert(after==unresolved-1,'previously unresolved invoice warning should clear')
 assert(d.autoTradesWire:find('FTTRADE2;',1,true),'persist automatic ledger for bridge')
 assert(d.autoTradeIssuesWire:find('FTISSUE2;',1,true),'persist unresolved observations')
+local issueRow=d.autoTradeIssuesWire:match('^FTISSUE2;([^;]+)')
+assert(issueRow and select(2,issueRow:gsub('|',''))==8,
+       'automatic unresolved row must have EXACTLY 9 fields, no Lua gsub count')
 print('Automatic AH trade tests PASS')
