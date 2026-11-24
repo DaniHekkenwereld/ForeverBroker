@@ -291,6 +291,9 @@ end
 local function ensureV4Identity(reason)
     local realm,character=identity()
     if not realm or not character then return false end
+    if AT and not AT.ready(realm,character) then
+        AT.login(db(),realm,character,now,GetMoney())
+    end
     recordCharacter(reason or 'identity')
     if V4 and not db().v4ActiveSession then
         V4.login(db(),now(),realm,character,s.walletKnown and s.cash or nil,bags)
@@ -718,6 +721,7 @@ local elapsed=0; frame:SetScript('OnUpdate',function(_,dt)
             check(function() ensureV4Identity('retry') end)
         end
         if AT then check(function() AT.onMoney(GetMoney());AT.update() end) end
+        if s.mailOpen then check(mailbox) end
         if s.active then check(function() mailSignal();update();maybeAutoSearch() end) end
     end
 end)
