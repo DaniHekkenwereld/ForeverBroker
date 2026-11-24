@@ -14,8 +14,8 @@ if ([string]::IsNullOrWhiteSpace([string]$cfg.wow_folder)) {
 foreach ($step in @(
     @{Name='1/4 Windows-addon en dashboard bijwerken';Script='update.ps1'},
     @{Name='2/4 VPS upgraden en servertests draaien';Script='DEPLOY-V4.ps1'},
-    @{Name='3/4 Automatische Windows-bridge installeren/starten';Script='INSTALL-V4-BRIDGE.ps1'},
-    @{Name='4/4 Portfolio en nieuwste advies synchroniseren';Script='PREPARE-V4.ps1'}
+    @{Name='3/4 Portfolio en nieuwste advies synchroniseren';Script='PREPARE-V4.ps1'},
+    @{Name='4/4 Automatische Windows-bridge installeren/starten';Script='INSTALL-V4-BRIDGE.ps1'}
 )) {
     Write-Host ''
     Write-Host $step.Name -ForegroundColor Cyan
