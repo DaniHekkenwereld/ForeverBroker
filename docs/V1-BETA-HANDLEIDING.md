@@ -14,14 +14,13 @@ Daarna kun je DASHBOARD-V4.bat gebruiken om alleen het dashboard te openen. De W
 
 ## Accountbrede portfolio opbouwen
 
-1. Log met de vernieuwde addon in op elk character.
-2. Open op elk character de bank minstens één keer. Anders kunnen bankitems niet betrouwbaar worden gelezen.
-3. Tassen inclusief gebonden items, uitgeruste gear en gold worden geregistreerd. Bij een open AH worden eigen veilingen geregistreerd.
-4. Typ /ft portfolio in WoW om direct de gemeten gold, tassen, gear en de bankstatus van dit character te controleren.
-5. Log uit of voer /reload uit; de client schrijft SavedVariables en de Windows-bridge verstuurt de informatie naar de VPS.
-6. Open het dashboard. Je ziet per character gold, voorraad per locatie, ouderdom van metingen, mogelijke marktwaarde en wat te controleren.
+1. Log met de vernieuwde addon in op elk character. Gold, tasitems en uitgeruste gear worden automatisch geregistreerd.
+2. Open de bank **alleen als je er items hebt**; dit is optioneel voor lege level-3-alts. Niet eerder gescande bankdata blijft 'onbekend', niet 'leeg'.
+3. Open het Auction House: de addon start zelfstandig de VPS-zoeklijst, controleert echte gameprijzen en houdt ook eigen veilingen bij. Geen /ft start of /ft auto on nodig.
+4. Log uit of gebruik /reload als je klaar bent; pas dan slaat WoW zijn SavedVariables op. De achtergrondbridge uploadt gold, voorraad, transacties én nauwkeurig gemeten gameprijzen naar de VPS.
+5. Het dashboard wordt iedere 30 seconden vanuit de VPS bijgewerkt. Onder In-game AH-prijzen op VPS opgeslagen zie je de laatste geverifieerde metingen met tijdstempel en bij eventuele koopkansen de prijs tegen de instaplimiet.
 
-Bankgegevens worden niet gewist omdat de bank bij een latere login gesloten is. Oude/ontbrekende stockmetingen worden zichtbaar gemaakt. De addon kan tijdens inloggen niet rechtstreeks over HTTPS synchroniseren. De synchronisatie vindt na een WoW-save plaats.
+Bankgegevens worden niet gewist omdat de bank bij een latere login gesloten is. Een bankmeting is optioneel en wordt niet als fout gemeld als je die nooit opent. De addon kan tijdens inloggen niet rechtstreeks over HTTPS synchroniseren. De automatische Windows-bridge controleert SavedVariables, maar de inhoud verandert pas wanneer WoW opslaat.
 
 ## Wat toont het dashboard?
 
@@ -31,11 +30,11 @@ Bankgegevens worden niet gewist omdat de bank bij een latere login gesloten is. 
 - Daghandel: bewezen herhalende koop-/verkoopuren, gebaseerd op 5 complete dagen met minstens 16 uurlijkse vraagprijzen per dag, niet gokken.
 - Investeringen: stijging/daling in 24 uur en 7 dagen, historisch goedkope instap, mogelijke koersomslag, risico en speculatieve weekscenario's.
 - Tier-/raidthema's: Arcane Crystal/Arcanite, enchanting-materialen, Elemental Fire, Black Lotus. Een raid-openingsdatum is geen gegarandeerde prijsstijging.
-- Wat controleert de addon: exacte itemlijst en opgeslagen werkelijk gemeten AH-vraagprijzen. In WoW zijn de actuele opdrachten zichtbaar met /ft auto status.
+- Wat controleert de addon: exacte itemlijst en opgeslagen werkelijk gemeten AH-vraagprijzen, automatisch gestart bij AH-openen; na WoW-save als VPS-metingen zichtbaar.
 
 ## In-game
 
-Open het AH en typ /ft auto on. Typ /ft auto status voor het aantal zoekopdrachten en resultaten. Typ /ft v4 voor de laatste per-character investeringsonderzoeken met instap- en scenarioverkoopprijs. Gameprijzen komen op het dashboard pas beschikbaar na een nieuw SavedVariables-save-event; de webpagina leest geen live WoW-geheugen.
+Open het AH. **Alle controles starten vanzelf**, met ingebouwde throttling. De addon toont welke items worden gecontroleerd; koop/verkoop voer je zelf uit. De Windows-bridge verstuurt opgeslagen gameprijsmetingen bij logout of /reload. Op het VPS-dashboard zie je bij elke gecontroleerde gameprijs een meettijd en bij kandidaatinkopen of de prijs onder de limiet lag. Tijdens een lopende WoW-sessie kan de VPS het gamegeheugen niet rechtstreeks uitlezen.
 
 ## Aankopen, verkopen en winst: automatisch
 
