@@ -157,10 +157,13 @@ class HttpV4Tests(unittest.TestCase):
            'at':stamp-40,'side':'SELL','item_id':12363,
            'quantity':1,'total_copper':80000,'source':'AH_MAIL'},
         ]
+        # Pending Forever seller invoice: quantity -1 sentinel and the
+        # refundable deposit initially exceeds gold visible in the mail.
+        # This MUST NOT reject the full character/bank/portfolio sync.
         issue={'id':'acc:unresolved1','character_key':key,
                'at':stamp-10,'side':'SELL','item_id':0,
-               'quantity':1,'total_copper':50000,
-               'reason':'MAIL_ITEM_UNRESOLVED','item_name':'Uncached Pattern'}
+               'quantity':-1,'total_copper':-500,
+               'reason':'MAIL_QUANTITY_UNRESOLVED','item_name':'Uncached Pattern'}
         payload={'schema':'FT4SYNC1','characters':[char],
                  'sessions':[],'trades':buys,'trade_issues':[issue]}
         response=self.req('/api/v4/sync','POST',payload)
@@ -170,6 +173,8 @@ class HttpV4Tests(unittest.TestCase):
         self.assertEqual(report['realized_profit'],30000)
         self.assertEqual(report['unresolved_ah_count'],1)
         self.assertEqual(report['unresolved_ah_events'][0]['item_name'],'Uncached Pattern')
+        self.assertEqual(report['unresolved_ah_events'][0]['quantity'],-1)
+        self.assertEqual(report['unresolved_ah_events'][0]['total_copper'],-500)
         self.assertEqual(self.req('/api/v4/sync','POST',payload)['trades_added'],0)
         payload['trade_issues']=[]
         self.assertEqual(self.req('/api/v4/sync','POST',payload)['unresolved_trades'],0)
