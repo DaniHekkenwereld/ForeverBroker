@@ -7,4 +7,5 @@
 Logic.lua
 Target.lua
 V4.lua
+AutoTrades.lua
 ForeverTrader.lua
