@@ -140,6 +140,10 @@ def render(research,now):
         headline='Geen onderbouwd koopsignaal op dit moment.'
         headline_kind='neutral'
 
+    swing_report=research.get('price_swings') or {}
+    swing_items=swing_report.get('swings') or []
+    swing_fresh=swing_report.get('market_fresh') is True
+
     stats=[
         ('💰','Gold · alle characters',
          gold(gold_total),str(len(characters))+' characters · laatst bekend'),
@@ -204,6 +208,34 @@ def render(research,now):
     hold_content=(''.join(hold_line(r) for r in summary['hold'][:2]) if summary['hold'] else
                   '<p class="empty-state">Nog geen items met een duidelijk '
                   'aanhoudadvies.</p>')
+    swing_rows=[]
+    for swing in swing_items[:4]:
+        if type(swing) is not dict or not valid_item(swing.get('id')):continue
+        live_dip=swing_fresh and swing.get('priority')==0
+        kind='warn' if live_dip else 'neutral'
+        state=('DIP — IN GAME CONTROLEREN' if live_dip else
+               'DIP GEZIEN / HERSTELD' if swing.get('priority')==1 else
+               'SCHOMMELING / BRON VEROUDERD')
+        swing_rows.append(
+            item_row(item_link(swing)+pill(kind,state),
+                '<strong>Laagste 24u: '+e(gold(swing.get('low_24h')))+
+                '</strong> · Hoogste 24u: '+e(gold(swing.get('high_24h')))+
+                ' · Nu: '+e(gold(swing.get('current_ask')))+
+                '<span class="focus-small">Verschil '+e(gold(swing.get('spread_copper')))+
+                ' ('+e(swing.get('swing_pct'))+'%) · publieke vraagprijzen, geen verkoopbewijs</span>',
+                kind))
+    swing_html=(
+        '<div class="swing-highlights">'
+        '<div class="swing-title"><h3>⚡ Grote prijsbewegingen (24 uur)</h3>'+
+        '<small>'+e(swing_report.get('active_dips') or 0)+' actuele dips · '+
+        e(swing_report.get('recovered_dips') or 0)+' herstelmomenten</small></div>'+
+        '<p class="hint">Ook bij zeldzame items zonder genoeg verkoopdata. '
+        'Dit zijn controlesignalen, geen automatische koopadviezen.</p>'+
+        (''.join(swing_rows) if swing_rows else
+         '<p class="empty-state">Nog geen grote prijsbewegingen met voldoende uurlijkse metingen.</p>')+
+        '<a href="#prijsbewegingen">Alle prijsbewegingen bekijken</a></div>'
+    )
+
     blocks=[
         ('🛒','Instap gecontroleerd',len(summary['buy']),'good',buy_content,
          'Geen automatische koop: check de actuele listing.'),
@@ -235,4 +267,4 @@ def render(research,now):
             '<p class="focus-headline '+headline_kind+'">'+e(headline)+'</p>'
             '<p>'+e(lead)+'</p></div>'+status+'</div>'+
             '<div class="focus-metrics">'+metrics+'</div>'+
-            '<div class="action-grid">'+cards+'</div>'+extra+'</section>')
+            swing_html+'<div class="action-grid">'+cards+'</div>'+extra+'</section>')
