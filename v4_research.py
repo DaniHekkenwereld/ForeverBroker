@@ -15,6 +15,7 @@ import v4_investing
 import v4_portfolio
 import v4_daily_radar
 import v4_game_prices
+import v4_price_swings
 
 MARKET = 'eu-2-110'
 RESEARCH_LIMIT = 120
@@ -43,6 +44,7 @@ def build(db, clock, cfg):
         'investments':[],'shortlist_count':0,'rising_count':0,'falling_count':0,
         'basket_change_7d_pct':None,'basket_item_count':0,
         'portfolio':None,'intraday':None,'game_checks':[],
+        'price_swings':{'swings':[],'total_swings':0,'active_dips':0,'recovered_dips':0},
         'last_attempt':trader.getmeta(db,'market_attempt',0) or None,
         'last_error':trader.getmeta(db,'market_last_error','') or None,
     }
@@ -59,6 +61,8 @@ def build(db, clock, cfg):
                   market_fresh=0<=age<=MARKET_FRESH_SECONDS,
                   market_age_seconds=age,
                   market_items=len(market))
+    # Whole-market 24h swings are a separate detector, NOT a 5-day daily strategy.
+    result['price_swings']=v4_price_swings.analyze(market,int(row['t']),clock)
     # The investment radar works on all affordable and unaffordable items.
     # Capital budgeting is presented separately; it never hides market trends.
     result.update(v4_investing.analyze(db,market,int(row['t']),cfg,clock))
