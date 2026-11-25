@@ -11,6 +11,7 @@ from collections import Counter
 
 import opportunities
 import v4_investing
+import v4_price_swings
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS v4_strategies (
@@ -94,7 +95,7 @@ def summarize_history(db, ids, market_t, days=14):
 
 
 def build_character(character, market, market_t, clock, cfg, history=None,
-                    investment_candidates=None):
+                    investment_candidates=None, swing_candidates=None):
     """Return a versioned plan and contextual actions for one character.
 
     Ask/lastSoldP are external price indicators; evidence remains unverified.
@@ -136,6 +137,14 @@ def build_character(character, market, market_t, clock, cfg, history=None,
                   if not r.get('variant_risk') and _positive(r.get('ask'))][:5]
         rows=[{'id':r['id'],'name':r['name'],'ask':r['ask'],
                'vol24':r.get('volume_24h') or 0} for r in good[:MAX_PLAN_ITEMS]]
+        if fresh_market and swing_candidates:
+            # Read-only price checks for large dips even when a rare
+            # book has no confirmed sales and no five-day pattern.
+            volatile=[{'id':r['id'],'name':r['name'],
+                       'ask':r['current_ask'],'vol24':r.get('volume_24h') or 0}
+                      for r in swing_candidates[:6]]
+            rows=list(dict((r['id'],r) for r in volatile+
+                           rows[:MAX_PLAN_ITEMS]).values())[:MAX_PLAN_ITEMS]
     ranked=[]
     actions=[]
     # Explicit investment review, not automatic buy authorisation.
@@ -294,11 +303,18 @@ def strategy_list(db, clock, cfg):
         bag_ids.update(bags)
     investments=(v4_investing.analyze(db,market,market_t,cfg,clock)['investments']
                  if market_t>0 else [])
+    swing_report=(v4_price_swings.analyze(market,market_t,clock,limit=40)
+                  if market_t>0 else {'swings':[]})
+    swing_candidates=[r for r in swing_report['swings']
+                      if r['priority']==0][:5]
+    swing_candidates += [r for r in swing_report['swings']
+                         if r['priority']==1][:1]
     h=summarize_history(db,[r['id'] for r in ranked]+list(bag_ids)+
                         [r['id'] for r in investments],market_t)
     out=[]
     for char in chars:
-        s=build_character(char,market,market_t,clock,cfg,h,investments)
+        s=build_character(char,market,market_t,clock,cfg,h,investments,
+                          swing_candidates)
         save_strategy(db,s)
         out.append(s)
     return out
