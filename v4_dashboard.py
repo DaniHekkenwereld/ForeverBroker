@@ -12,6 +12,7 @@ import v4_investing_ui
 import v4_portfolio_ui
 import v4_daily_ui
 import v4_quickview
+import v4_price_swings
 
 
 def escape(value):
@@ -273,6 +274,13 @@ footer{padding-top:20px;color:#8e9bb0;font-size:12px}
 .action-icon{width:34px;height:34px;border-radius:9px;display:grid;place-items:center;background:#24374c;font-size:19px}
 .action-count{font-size:21px;font-weight:800;font-variant-numeric:tabular-nums}
 .action-card-body{margin-top:11px;flex:1;min-width:0}
+.swing-highlights{margin-bottom:16px;padding:14px 17px;border-radius:11px;border:1px solid #6c5639;background:#241e1c}
+.swing-title{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.swing-title h3{font-size:15px}
+.swing-title small{color:#d8b886}
+.swing-highlights>.hint{margin:4px 0 7px}
+.swing-highlights>.focus-row{padding:9px 0}
+.swing-highlights>a{display:inline-block;margin-top:9px;font-size:12px;font-weight:700}
 .focus-row{padding:10px 0;border-top:1px solid #26364a}
 .focus-row:first-child{border-top:0}
 .focus-item{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-weight:650}
@@ -409,6 +417,10 @@ def render(strategies,refreshed,research=None,activity=None,filters=None):
             str(len(portfolio.get('characters') or []))+' characters · '+
             str(portfolio.get('holding_types') or 0)+' itemsoorten · '+
             str(portfolio.get('trade_count') or 0)+' transacties',portfolio_html),
+        detail_group('prijsbewegingen','⚡ Grote prijsbewegingen (24 uur)',
+            str((research.get('price_swings') or {}).get('total_swings') or 0)+
+            ' prijsafwijkingen · geen bewezen transacties',
+            v4_price_swings.render_details(research.get('price_swings'))),
         detail_group('daghandel','🕘 Daghandel',
             str(len((research.get('intraday') or {}).get('patterns') or []))+
             ' onderbouwde patronen',daily_html),
