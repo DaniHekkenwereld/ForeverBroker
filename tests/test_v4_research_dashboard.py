@@ -79,6 +79,30 @@ class MarketResearchTests(unittest.TestCase):
         self.assertIn('1111',report['lookup'])
 
 
+    def test_codex_flash_dip_reaches_vps_research_and_visual_dashboard(self):
+        # 31g asks amid 40-42g asks are real market observations, even if the
+        # book has zero confirmed sales and insufficient repeatable daily data.
+        codex={
+            'name':'Codex of Defense','cls':'Recipe','nc':True,
+            'ask':310000,'ask2':420000,'listed':10,'depth5':1,
+            'vol24':0,'history':[420000]*8+[350000]*2+
+                             [420000]*3+[310000]*3+[407700]*8}
+        market={**self.market,18357:codex}
+        self.db.execute('UPDATE market_snapshots SET payload=? WHERE t=?',
+                        (json.dumps(market),self.now))
+        self.db.commit()
+        report=v4_research.build(self.db,self.now,self.cfg)
+        found=next(x for x in report['price_swings']['swings']
+                   if x['id']==18357)
+        self.assertEqual(found['low_24h'],310000)
+        self.assertEqual(found['high_24h'],420000)
+        self.assertEqual(found['status'],'DIP — IN GAME CONTROLEREN')
+        self.assertEqual(report['intraday']['patterns'],[])
+        rendered=v4_dashboard.render([],self.now,report,{})
+        self.assertIn('Codex of Defense',rendered)
+        self.assertIn('Grote prijsbewegingen (24 uur)',rendered)
+        self.assertNotIn('Koop nu',rendered)
+
     def test_authenticated_research_api_end_to_end(self):
         token='only-a-test-token-that-is-long-enough-for-unit-testing'
         with ThreadingHTTPServer(('127.0.0.1',0),v4_server.Handler) as server:
