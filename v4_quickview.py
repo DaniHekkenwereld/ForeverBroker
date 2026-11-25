@@ -142,6 +142,14 @@ def render(research,now):
 
     swing_report=research.get('price_swings') or {}
     swing_items=swing_report.get('swings') or []
+    # Prefer swing candidates whose *current listing price* is within the
+    # account's last-known total gold. This ranks the dashboard, NOT budgets.
+    wallet=portfolio.get('gold_total_last_known')
+    if type(wallet) is int and wallet>0:
+        swing_items=sorted(swing_items,key=lambda r:(
+            not (type(r.get('current_ask')) is int and
+                 0<r['current_ask']<=wallet),
+            r.get('priority',9),-(r.get('spread_copper') or 0)))
     swing_fresh=swing_report.get('market_fresh') is True
 
     stats=[
