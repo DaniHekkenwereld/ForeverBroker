@@ -67,7 +67,7 @@ class RareBookSwingTests(unittest.TestCase):
         self.assertIn(';18357:0:0:0:0',result['plan'])
         self.assertFalse(any(x['kind'] in ('VERIFY_BUY','INVEST_SHORT','INVEST_LONG')
                              for x in result['actions']))
-        self.assertFalse(result['warning'] if 'warning' in result else False)
+        self.assertIn('geen bewezen verkopen',result['warning'])
 
     def test_no_fake_signal_with_thin_history_and_stale_source(self):
         empty=codex()
