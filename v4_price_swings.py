@@ -95,8 +95,8 @@ def render_details(report):
         id=row['id']
         name=html.escape(str(row['name']),quote=True)
         label=html.escape(str(row['status']),quote=True)
-        link='<a href="https://auctionhouse.tk.gg/m/eu-2-110/'+str(id)+
-             '" target="_blank" rel="noopener noreferrer">'+name+'</a>'
+        link=('<a href="https://auctionhouse.tk.gg/m/eu-2-110/'+str(id)+
+              '" target="_blank" rel="noopener noreferrer">'+name+'</a>')
         rows.append('<tr><td class="name">'+link+
                     '<small class="sub">#'+str(id)+'</small></td>'+
                     '<td><span class="state">'+label+'</span></td>'+
